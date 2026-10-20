@@ -1,0 +1,32 @@
+{
+  "team_id": 444,
+  "group": {
+    "group_id": 50031,
+    "name": "Proofreading admins",
+    "permissions": {
+      "is_admin": true,
+      "is_reviewer": true,
+      "admin_rights": [
+        "upload",
+        "download",
+        "tasks",
+        "contributors",
+        "screenshots",
+        "glossary",
+        "keys",
+        "languages",
+        "settings",
+        "activity",
+        "statistics"
+      ],
+      "languages": {}
+    },
+    "created_at": "2019-01-07 14:21:44 (Etc/UTC)",
+    "created_at_timestamp": 1546257600,
+    "team_id": 444,
+    "projects": [
+      "598901215bexxx43dcba74.xxx"
+    ],
+    "members": {}
+  }
+}

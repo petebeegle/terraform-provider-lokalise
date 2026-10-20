@@ -1,0 +1,70 @@
+{
+  "project_id": "3002780358964f9bab5a92.87762498",
+  "project_type": "localization_files",
+  "name": "TheApp Project",
+  "description": "iOS + Android strings of TheApp. https://theapp.com",
+  "created_at": "2018-12-31 12:00:00 (Etc/UTC)",
+  "created_at_timestamp": 1546257600,
+  "created_by": 420,
+  "created_by_email": "user@mycompany.com",
+  "team_id": 12345,
+  "base_language_id": 640,
+  "base_language_iso": "en",
+  "settings": {
+    "per_platform_key_names": false,
+    "reviewing": false,
+    "auto_toggle_unverified": true,
+    "offline_translation": false,
+    "key_editing": true,
+    "inline_machine_translations": true,
+    "custom_translation_statuses": true,
+    "custom_translation_statuses_allow_multiple": false,
+    "segmentation": false,
+    "contributor_preview_download_enabled": false
+  },
+  "statistics": {
+    "progress_total": 87,
+    "keys_total": 13,
+    "team": 2,
+    "base_words": 22,
+    "qa_issues_total": 65,
+    "qa_issues": {
+      "not_reviewed": 39,
+      "unverified": 7,
+      "spelling_grammar": 4,
+      "inconsistent_placeholders": 5,
+      "inconsistent_html": 1,
+      "different_number_of_urls": 0,
+      "different_urls": 1,
+      "leading_whitespace": 1,
+      "trailing_whitespace": 0,
+      "different_number_of_email_address": 0,
+      "different_email_address": 0,
+      "different_brackets": 6,
+      "different_numbers": 1,
+      "double_space": 1,
+      "special_placeholder": 0,
+      "unbalanced_brackets": 0
+    },
+    "languages": [
+      {
+        "language_id": 640,
+        "language_iso": "en",
+        "progress": 100,
+        "words_to_do": 0
+      },
+      {
+        "language_id": 800,
+        "language_iso": "lv_LV",
+        "progress": 100,
+        "words_to_do": 0
+      },
+      {
+        "language_id": 673,
+        "language_iso": "fr",
+        "progress": 63,
+        "words_to_do": 8
+      }
+    ]
+  }
+}
