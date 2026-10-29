@@ -43,7 +43,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
   "https://api.lokalise.com/api2/projects/$(jq -r .project_id /tmp/project.json)"
 ```
 
-Observed: 2026-10-29: as assumed. POST and GET both return the project unwrapped, with `base_language_iso`.## 2. `base_language_iso` normalization
+Observed: 2026-10-29: as assumed. POST and GET both return the project unwrapped, with `base_language_iso`.
+
+## 2. `base_language_iso` normalization
 
 Assumption: the base ISO code the server returns on GET equals the
 `base_lang_iso` sent on create, verbatim. If Lokalise normalizes case or
@@ -61,13 +63,17 @@ resource "lokalise_project" "check" {
 
 Run `terraform apply` then `terraform plan` again with no config change.
 
-Observed: 2026-10-29: `en_US` round-trips verbatim; no diff on re-plan.## 3. Duplicate project names
+Observed: 2026-10-29: `en_US` round-trips verbatim; no diff on re-plan.
+
+## 3. Duplicate project names
 
 Assumption: project names are not unique; the real API's behavior on a
 duplicate name (second create with the same `name`) is unknown — does it
 succeed, as the fake assumes?
 
-Observed: 2026-10-29: duplicate names are accepted (200, new `project_id`).## 3a. Empty `description` clears the field on update
+Observed: 2026-10-29: duplicate names are accepted (200, new `project_id`).
+
+## 3a. Empty `description` clears the field on update
 
 Assumption: `lokalise_project`'s Create omits `description` from the request
 body when empty, but Update always sends `description` (including `""`), so
@@ -82,7 +88,9 @@ curl -s -X PUT -H "X-Api-Token: $LOKALISE_API_TOKEN" -H 'Content-Type: applicati
 
 Then GET the project and confirm `description` is now empty, not unchanged.
 
-Observed: 2026-10-29: `description: ""` on PUT clears it; GET returns `""`.## 3b. `team_id` response type
+Observed: 2026-10-29: `description: ""` on PUT clears it; GET returns `""`.
+
+## 3b. `team_id` response type
 
 Assumption: `team_id` always comes back as a JSON number that fits in
 int64. The OpenAPI spec allows the create request to take either a number
@@ -97,7 +105,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
 
 Expect `"number"`.
 
-Observed: 2026-10-29: `"number"`.## 3c. `project_type` default when omitted
+Observed: 2026-10-29: `"number"`.
+
+## 3c. `project_type` default when omitted
 
 Assumption: when Create omits `project_type` entirely, the server defaults
 it to `localization_files`. `lokalise_project` has no client-side default:
@@ -112,7 +122,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" -H 'Content-Type: application/json
 
 Confirm the returned `project_type` is `localization_files`.
 
-Observed: 2026-10-29: `localization_files`.## 4. Language list/create/get/update/delete shapes
+Observed: 2026-10-29: `localization_files`.
+
+## 4. Language list/create/get/update/delete shapes
 
 Assumption: `GET /projects/{id}/languages` returns
 `{"project_id":.., "languages":[{"lang_id","lang_iso","lang_name","is_rtl","plural_forms"}]}`.
@@ -138,7 +150,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
 
 Expect `["language","project_id"]` for the single-language GET.
 
-Observed: 2026-10-29: as assumed. Single-language GET keys are `language`, `project_id` (plus `project_uuid`). The list and POST entries also carry `project_language_id` as a string.## 5. `lang_iso` mutability via PUT
+Observed: 2026-10-29: as assumed. Single-language GET keys are `language`, `project_id` (plus `project_uuid`). The list and POST entries also carry `project_language_id` as a string.
+
+## 5. `lang_iso` mutability via PUT
 
 Assumption: `PUT /projects/{id}/languages/{language_id}` accepts `lang_iso`
 in the body and the provider treats `lang_iso` as updatable in place (no
@@ -156,7 +170,9 @@ curl -s -X PUT -H "X-Api-Token: $LOKALISE_API_TOKEN" -H 'Content-Type: applicati
 
 Then `GET` the same language and confirm whether `lang_iso` actually changed.
 
-Observed: 2026-10-29: PUT `{"lang_iso":"fr_FR"}` changes it (GET confirms), so in-place update is correct. Lokalise uses `_`, not `-`.## 5a. `custom_name` empty-string handling on language create
+Observed: 2026-10-29: PUT `{"lang_iso":"fr_FR"}` changes it (GET confirms), so in-place update is correct. Lokalise uses `_`, not `-`.
+
+## 5a. `custom_name` empty-string handling on language create
 
 Assumption: `CreateLanguageInput.CustomName` is sent via `omitempty`, so a
 `custom_name = ""` in `lokalise_project_language` config omits the field
@@ -172,7 +188,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" -H 'Content-Type: application/json
 
 Confirm the returned `lang_name` for the new language defaults to `de`.
 
-Observed: 2026-10-29: `lang_name` defaults to Lokalise's display name (`German`), not the ISO code.## 5b. Project-language `lang_id` space
+Observed: 2026-10-29: `lang_name` defaults to Lokalise's display name (`German`), not the ISO code.
+
+## 5b. Project-language `lang_id` space
 
 Assumption: the fake synthesizes `lang_id` as an FNV hash of the ISO code
 (e.g. not a real system ID). Confirm what a real project language's
@@ -196,7 +214,9 @@ match the fake's placeholder guesses (`lang_name` = the ISO code,
 `plural_forms` = `["one","other"]`) or whether the real API fills in a
 proper display name and locale-appropriate plural categories.
 
-Observed: 2026-10-29: a project language's `lang_id` is the system ID (`en` 640, `fr` 673, `de` 666). Real names and plural forms come back (`French`, `["one","other"]`); the fake's ISO-code names are placeholders.## 6. Deleting the base language
+Observed: 2026-10-29: a project language's `lang_id` is the system ID (`en` 640, `fr` 673, `de` 666). Real names and plural forms come back (`French`, `["one","other"]`); the fake's ISO-code names are placeholders.
+
+## 6. Deleting the base language
 
 Assumption: `DELETE /projects/{id}/languages/{base_language_id}` fails (the
 project can't exist without its base language), matching
@@ -208,13 +228,17 @@ curl -s -X DELETE -H "X-Api-Token: $LOKALISE_API_TOKEN" \
   "https://api.lokalise.com/api2/projects/<project_id>/languages/<base_language_id>"
 ```
 
-Observed: 2026-10-29: **assumption wrong.** DELETE on the base language returns `200 {"language_deleted":true}`. The provider never deletes the base language, so nothing depends on this; the fake now allows it too.## 7. Duplicate language status code
+Observed: 2026-10-29: **assumption wrong.** DELETE on the base language returns `200 {"language_deleted":true}`. The provider never deletes the base language, so nothing depends on this; the fake now allows it too.
+
+## 7. Duplicate language status code
 
 Assumption: creating a language ISO that already exists on the project
 returns an error (exact status/body unconfirmed; the provider never parses
 it — duplicates are caught by listing first).
 
-Observed (status code + body): 2026-10-29: **not an HTTP error.** `200` with `"languages": []` and `"errors": [{"message":"Language is already added to the project","code":208,"lang_iso":"de"}]`. The client now returns `errors[0]` as an `*APIError`.## 13a. Custom permission-template roles beyond the 5 built-ins
+Observed (status code + body): 2026-10-29: **not an HTTP error.** `200` with `"languages": []` and `"errors": [{"message":"Language is already added to the project","code":208,"lang_iso":"de"}]`. The client now returns `errors[0]` as an `*APIError`.
+
+## 13a. Custom permission-template roles beyond the 5 built-ins
 
 Assumption: the fake always seeds the same 5 built-in roles (1 Manager,
 2 Developer, 3 Content creator, 4 Reviewer, 5 Translator) for any
@@ -236,7 +260,9 @@ data "lokalise_permission_template" "custom" {
 }
 ```
 
-Observed: 2026-10-29: the team tested has only the 5 built-in roles; no custom role to test.## 14. `GET /teams/{team_id}/roles` field names
+Observed: 2026-10-29: the team tested has only the 5 built-in roles; no custom role to test.
+
+## 14. `GET /teams/{team_id}/roles` field names
 
 Assumption: `{"roles":[{"id":N,"role":"Name", ...}, ...]}` — the ID field is
 `id` (fixed from the OpenAPI example; previously assumed `role_id`, which
@@ -248,7 +274,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
   "https://api.lokalise.com/api2/teams/$TEAM_ID/roles" | jq '.roles[0] | {id, role}'
 ```
 
-Observed: 2026-10-29: as assumed (`id`, `role`).## 15. Group create/update response envelope and language ID space
+Observed: 2026-10-29: as assumed (`id`, `role`).
+
+## 15. Group create/update response envelope and language ID space
 
 Assumption: `POST .../groups` and `PUT .../groups/{group_id}` return
 `{"team_id":.., "group":{...}}`, while `GET .../groups/{group_id}` returns
@@ -275,7 +303,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
 Expect `["group","team_id"]` for the POST and the group's own keys
 (`group_id`, `name`, `permissions`, ...) for the GET.
 
-Observed: 2026-10-29: as assumed. POST/PUT keys are `group`, `team_id`; GET is unwrapped. System language IDs work.## 15a. `GET /system/languages` envelope and pagination
+Observed: 2026-10-29: as assumed. POST/PUT keys are `group`, `team_id`; GET is unwrapped. System language IDs work.
+
+## 15a. `GET /system/languages` envelope and pagination
 
 Assumption: the response is `{"languages": [{"lang_id", "lang_iso"}]}`,
 either unpaginated or returning everything on page 1 — the client's
@@ -297,7 +327,9 @@ Expect the `X-Pagination-*` headers to say the same total as `languages |
 length` on this one call (i.e. everything came back on page 1), or for the
 headers to be absent entirely (unpaginated).
 
-Observed: 2026-10-29: **paginated**: `x-pagination-total-count: 734`, 100 per page, 8 pages. `listAll` follows `x-pagination-page-count` correctly (groups with `en`/`fr` were created through Terraform).## 16. Group GET `permissions.languages` shape
+Observed: 2026-10-29: **paginated**: `x-pagination-total-count: 734`, 100 per page, 8 pages. `listAll` follows `x-pagination-page-count` correctly (groups with `en`/`fr` were created through Terraform).
+
+## 16. Group GET `permissions.languages` shape
 
 Assumption: `GET .../groups/{id}` nests a flat array
 `[{"lang_id", "lang_iso", "lang_name", "is_writable"}]` under
@@ -312,7 +344,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
   "https://api.lokalise.com/api2/teams/$TEAM_ID/groups/<group_id>"
 ```
 
-Observed: 2026-10-29: a language in both `reference` and `contributable` is stored once, `is_writable: true`. After an update with `reference:[640], contributable:[]`, 640 reads back `is_writable: false`.## 17. Group with no languages, `admin_rights`-only
+Observed: 2026-10-29: a language in both `reference` and `contributable` is stored once, `is_writable: true`. After an update with `reference:[640], contributable:[]`, 640 reads back `is_writable: false`.
+
+## 17. Group with no languages, `admin_rights`-only
 
 Assumption: a group create/update with no languages sends
 `"languages":{"reference":[],"contributable":[]}` (empty arrays, never
@@ -331,13 +365,17 @@ resource "lokalise_team_user_group" "admin_only" {
 
 Apply, then `terraform plan` again with no config change.
 
-Observed: 2026-10-29: **rejected.** Empty or missing `reference` → `400 Invalid languages.reference parameter`; missing `contributable` → `400 Invalid languages.contributable parameter`. `reference:[640], contributable:[]` is accepted on create but stores **no** languages (on update it stores 640 as reference). Fixed: `languages.contributable` is now required with at least one entry, and the client sends the contributable languages as `reference` when `reference` is empty.## 18. `is_admin`/`is_reviewer` on group create/update
+Observed: 2026-10-29: **rejected.** Empty or missing `reference` → `400 Invalid languages.reference parameter`; missing `contributable` → `400 Invalid languages.contributable parameter`. `reference:[640], contributable:[]` is accepted on create but stores **no** languages (on update it stores 640 as reference). Fixed: `languages.contributable` is now required with at least one entry, and the client sends the contributable languages as `reference` when `reference` is empty.
+
+## 18. `is_admin`/`is_reviewer` on group create/update
 
 Assumption: these are deprecated boolean fields the create/update endpoints
 still require; the client always sends `false` for both. Confirm the API
 accepts `false,false` for every group regardless of `admin_rights`/`role_id`.
 
-Observed: 2026-10-29: `false,false` is accepted, but a group created with `admin_rights` reads back `is_admin: true`. The provider doesn't expose `is_admin`.## 19. Group member/project add-remove envelope
+Observed: 2026-10-29: `false,false` is accepted, but a group created with `admin_rights` reads back `is_admin: true`. The provider doesn't expose `is_admin`.
+
+## 19. Group member/project add-remove envelope
 
 Confirmed against the OpenAPI examples (worth a live sanity check):
 `PUT .../groups/{id}/members/add|remove` and
@@ -352,7 +390,9 @@ curl -s -X PUT -H "X-Api-Token: $LOKALISE_API_TOKEN" -H 'Content-Type: applicati
   "https://api.lokalise.com/api2/teams/$TEAM_ID/groups/<group_id>/members/add"
 ```
 
-Observed: 2026-10-29: as assumed; every add/remove returns `{team_id, group}`.## 21. `GET /teams/{team_id}/users` role field
+Observed: 2026-10-29: as assumed; every add/remove returns `{team_id, group}`.
+
+## 21. `GET /teams/{team_id}/users` role field
 
 Confirmed against the OpenAPI spec (not a guess), worth a live check: `role`
 is a plain string (e.g. `"owner"`, `"member"`), not a structured object.
@@ -362,7 +402,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
   "https://api.lokalise.com/api2/teams/$TEAM_ID/users"
 ```
 
-Observed: 2026-10-29: as assumed (`"member"`).## 22. 429 behavior under load
+Observed: 2026-10-29: as assumed (`"member"`).
+
+## 22. 429 behavior under load
 
 Assumption: the client's shared token-bucket rate limiter (≤6 req/s) plus
 exponential-backoff-with-jitter retry on 429 (all methods) and 5xx/network
@@ -377,7 +419,9 @@ against a config with at least 10-15 resources (project + several languages
 + groups, a member and a group-project assignment). Watch for any `429` that surfaces as a Terraform
 error instead of being retried transparently.
 
-Observed: 2026-10-29: 13 resources at `-parallelism=10` applied in ~2s with no 429 surfaced.## 23. Import of a real existing project yields an empty plan
+Observed: 2026-10-29: 13 resources at `-parallelism=10` applied in ~2s with no 429 surfaced.
+
+## 23. Import of a real existing project yields an empty plan
 
 Pick (or hand-create in the UI) an existing project not managed by
 Terraform.
@@ -391,7 +435,7 @@ Expected: no diff, once the config's `name`/`description`/`base_language_iso`
 match the imported state, and `deletion_protection = true` needs no config
 line to avoid a diff.
 
-Observed:
+Observed: 2026-10-29: `terraform import` of a hand-made project (`test-terraform-import`, base `en`, no description) succeeded, and `plan` with a config omitting `deletion_protection` and `project_type` showed no changes.
 
 ## 24. Error body shape
 
@@ -406,7 +450,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" -H 'Content-Type: application/json
   "https://api.lokalise.com/api2/projects/<project_id>/languages"
 ```
 
-Observed: 2026-10-29: language create reports this in a 200 body, not an error body: `{"errors":[{"message":"`lang_iso` parameter should be in a scope of system languages","code":400,"lang_iso":"not-a-language"}]}`. Other endpoints' 400s use `{"error":{"message","code"}}` with no `details` seen.## 25. Group `role_id` location
+Observed: 2026-10-29: language create reports this in a 200 body, not an error body: `{"errors":[{"message":"`lang_iso` parameter should be in a scope of system languages","code":400,"lang_iso":"not-a-language"}]}`. Other endpoints' 400s use `{"error":{"message","code"}}` with no `details` seen.
+
+## 25. Group `role_id` location
 
 Assumption: the OpenAPI `TeamUserGroups` schema puts `role_id` at the top
 level of a group, but every example nests it under `permissions.role_id`.
@@ -419,7 +465,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
   "https://api.lokalise.com/api2/teams/$TEAM_ID/groups/<group_id>" | jq '{top: .role_id, nested: .permissions.role_id}'
 ```
 
-Observed: 2026-10-29: nested under `permissions.role_id`; `null` when no role.## 27. `members/add` integer vs string user IDs
+Observed: 2026-10-29: nested under `permissions.role_id`; `null` when no role.
+
+## 27. `members/add` integer vs string user IDs
 
 Assumption: `PUT .../groups/{id}/members/add|remove` take
 `{"users":[<int>, ...]}` (integers, as the OpenAPI example shows) and
@@ -433,7 +481,9 @@ curl -s -X PUT -H "X-Api-Token: $LOKALISE_API_TOKEN" -H 'Content-Type: applicati
   "https://api.lokalise.com/api2/teams/$TEAM_ID/groups/<group_id>/members/add" | jq '.group.members'
 ```
 
-Observed: 2026-10-29: `members` are integers; `projects` are project-ID strings.## 28. `{}` empty arrays and integer `is_writable`
+Observed: 2026-10-29: `members` are integers; `projects` are project-ID strings.
+
+## 28. `{}` empty arrays and integer `is_writable`
 
 Assumption: the OpenAPI examples serialize empty arrays as `{}`
 (`"admin_rights": {}`, `"members": {}`, `"projects": {}`,
@@ -454,7 +504,9 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
 Note any other encoding (e.g. `"1"`, `"true"`) — the client accepts those
 too, but anything else fails to decode.
 
-Observed: 2026-10-29: empty arrays come back as `[]`, not `{}`; contributor `is_writable` is a boolean. A group's `admin_rights` is never empty: Lokalise adds `branches_main_modify` to every group, with or without `role_id`. Fixed: `lokalise_team_user_group` keeps the configured `admin_rights` when the API's set contains all of them.## 29. POST is not retried on 5xx or network errors
+Observed: 2026-10-29: empty arrays come back as `[]`, not `{}`; contributor `is_writable` is a boolean. A group's `admin_rights` is never empty: Lokalise adds `branches_main_modify` to every group, with or without `role_id`. Fixed: `lokalise_team_user_group` keeps the configured `admin_rights` when the API's set contains all of them.
+
+## 29. POST is not retried on 5xx or network errors
 
 Behavior (not an assumption): the client retries a `POST` only on `429`. A
 `5xx` (e.g. a `502`/`504` from a gateway) or a dropped connection on a
