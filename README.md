@@ -1,17 +1,16 @@
 # Terraform Provider for Lokalise
 
 A Terraform provider for managing [Lokalise](https://lokalise.com) projects,
-project languages, contributors, and team user groups (permissions,
-members, project assignments) — the setup work done by hand in the Lokalise
-UI today.
+project languages, and team user groups (permissions, members, project
+assignments) — the setup work done by hand in the Lokalise UI today.
+Project access is granted through groups: a group's role and languages,
+its members, and the projects assigned to it.
 
 ## What this provider manages
 
 - `lokalise_project` — a project (name, description, team, type, base
   language).
 - `lokalise_project_language` — a language added to a project.
-- `lokalise_contributor` — a project contributor (role or explicit
-  `admin_rights`, per-language read/write access).
 - `lokalise_team_user_group` — a team user group's own fields (name, role /
   `admin_rights`, language grants).
 - `lokalise_team_user_group_member` — one user's membership in a group.
@@ -31,18 +30,23 @@ into Terraform.
   API only exposes these read-only.
 - Keys, translations, files, screenshots, glossary — content, not setup.
 - Webhooks.
+- Per-project contributors. Grant access through a group instead
+  (`lokalise_team_user_group` + `_member` + `_project`); one-off contributors
+  stay in the UI. A `lokalise_contributor` resource exists on the
+  `contributor-resource` branch but is unverified against the live API,
+  which needs a second Lokalise user to test.
 - Creating or inviting team users directly — no such API exists. A user
-  joins a team by being added as a contributor (Lokalise emails an invite)
-  or added to a team group.
+  must already be on the team before `lokalise_team_user_group_member` can
+  add them to a group.
 
 ### Non-authoritative
 
 This provider is **non-authoritative**: no resource removes anything it did
 not create itself. One resource instance manages exactly one item (one
-language, one contributor, one group member, one group-project assignment).
-Declaring a `lokalise_contributor` for `alice@example.com` never removes
-other contributors the UI or another team added by hand; destroying that
-resource removes only Alice. If you want a resource gone, you must
+language, one group member, one group-project assignment).
+Declaring a `lokalise_team_user_group_member` for Alice never removes other
+members the UI or another team added by hand; destroying that resource
+removes only Alice. If you want a resource gone, you must
 explicitly destroy it — nothing is pruned implicitly by omission from
 config.
 
@@ -68,7 +72,6 @@ Every resource supports `terraform import`:
 ```shell
 terraform import lokalise_project.example <project_id>
 terraform import lokalise_project_language.example <project_id>:<lang_iso>
-terraform import lokalise_contributor.example <project_id>:<email>
 terraform import lokalise_team_user_group.example <team_id>:<group_id>
 terraform import lokalise_team_user_group_member.example <team_id>:<group_id>:<user_id>
 terraform import lokalise_team_user_group_project.example <team_id>:<group_id>:<project_id>

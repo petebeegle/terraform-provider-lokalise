@@ -322,10 +322,9 @@ func (r *TeamUserGroupResource) ImportState(ctx context.Context, req resource.Im
 
 // applyGroup copies API-owned fields from g into m and recomputes id.
 //
-// Whether role_id or admin_rights ends up set follows the same rule as
-// lokalise_contributor (see useRoleIDOverAdminRights): whichever the user
-// configured is preserved instead of being re-derived from the API response
-// on every read.
+// Whether role_id or admin_rights ends up set follows
+// useRoleIDOverAdminRights: whichever the user configured is preserved
+// instead of being re-derived from the API response on every read.
 func (m *TeamUserGroupResourceModel) applyGroup(ctx context.Context, teamID int64, g *client.Group, idToISO map[int64]string) diag.Diagnostics {
 	var diags diag.Diagnostics
 

@@ -1,14 +1,15 @@
 data "lokalise_permission_template" "translator" {
-  team_id = lokalise_project.example.team_id
+  team_id = 123456
   name    = "Translator"
 }
 
-resource "lokalise_contributor" "french_translator" {
-  project_id = lokalise_project.example.id
-  email      = "translator@example.com"
-  role_id    = data.lokalise_permission_template.translator.role_id
+resource "lokalise_team_user_group" "french_translators" {
+  team_id = 123456
+  name    = "French translators"
+  role_id = data.lokalise_permission_template.translator.role_id
 
-  languages = [
-    { lang_iso = "fr", is_writable = true },
-  ]
+  languages = {
+    reference     = ["en"]
+    contributable = ["fr"]
+  }
 }

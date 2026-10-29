@@ -47,7 +47,7 @@ func (d *PermissionTemplateDataSource) Metadata(ctx context.Context, req datasou
 
 func (d *PermissionTemplateDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Looks up a Lokalise team's permission template (role) by name, returning its `role_id` for use in `lokalise_contributor.role_id` or `lokalise_team_user_group.role_id`.",
+		MarkdownDescription: "Looks up a Lokalise team's permission template (role) by name, returning its `role_id` for use in `lokalise_team_user_group.role_id`.",
 		Attributes: map[string]schema.Attribute{
 			"team_id": schema.Int64Attribute{
 				MarkdownDescription: "Team ID to look up the permission template in.",

@@ -15,9 +15,9 @@ func TestSplitID(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "two parts", id: "a:b", n: 2, format: "project_id:language_id", want: []string{"a", "b"}},
-		{name: "three parts", id: "a:b:c", n: 3, format: "project_id:language_id:contributor_id", want: []string{"a", "b", "c"}},
+		{name: "three parts", id: "a:b:c", n: 3, format: "team_id:group_id:user_id", want: []string{"a", "b", "c"}},
 		{name: "too few parts", id: "a", n: 2, format: "project_id:language_id", wantErr: true},
-		{name: "empty part", id: "a::c", n: 3, format: "project_id:language_id:contributor_id", wantErr: true},
+		{name: "empty part", id: "a::c", n: 3, format: "team_id:group_id:user_id", wantErr: true},
 		{name: "too many parts", id: "a:b:c", n: 2, format: "project_id:language_id", wantErr: true},
 	}
 

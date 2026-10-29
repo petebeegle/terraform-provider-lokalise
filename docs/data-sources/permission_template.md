@@ -3,29 +3,30 @@
 page_title: "lokalise_permission_template Data Source - lokalise"
 subcategory: ""
 description: |-
-  Looks up a Lokalise team's permission template (role) by name, returning its role_id for use in lokalise_contributor.role_id or lokalise_team_user_group.role_id.
+  Looks up a Lokalise team's permission template (role) by name, returning its role_id for use in lokalise_team_user_group.role_id.
 ---
 
 # lokalise_permission_template (Data Source)
 
-Looks up a Lokalise team's permission template (role) by name, returning its `role_id` for use in `lokalise_contributor.role_id` or `lokalise_team_user_group.role_id`.
+Looks up a Lokalise team's permission template (role) by name, returning its `role_id` for use in `lokalise_team_user_group.role_id`.
 
 ## Example Usage
 
 ```terraform
 data "lokalise_permission_template" "translator" {
-  team_id = lokalise_project.example.team_id
+  team_id = 123456
   name    = "Translator"
 }
 
-resource "lokalise_contributor" "french_translator" {
-  project_id = lokalise_project.example.id
-  email      = "translator@example.com"
-  role_id    = data.lokalise_permission_template.translator.role_id
+resource "lokalise_team_user_group" "french_translators" {
+  team_id = 123456
+  name    = "French translators"
+  role_id = data.lokalise_permission_template.translator.role_id
 
-  languages = [
-    { lang_iso = "fr", is_writable = true },
-  ]
+  languages = {
+    reference     = ["en"]
+    contributable = ["fr"]
+  }
 }
 ```
 

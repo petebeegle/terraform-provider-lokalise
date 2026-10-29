@@ -238,96 +238,6 @@ it — duplicates are caught by listing first).
 
 Observed (status code + body):
 
-## 8. Contributor response shape
-
-Assumption: a contributor object has `user_id`, `email`, `fullname`,
-`role_id` (nullable), `admin_rights` (`[]string`, or `{}` when empty),
-`languages` (`[]{lang_iso, is_writable}`). Create is a bulk POST
-`{"contributors":[{...}]}` returning the created contributor under a
-**singular** key, `{"project_id":.., "contributor":{...}}`; the client also
-accepts a plural `"contributors"` array. `GET` and `PUT
-.../contributors/{user_id}` return `{"project_id":.., "contributor":{...}}`.
-(All three envelopes fixed from the OpenAPI examples; previously assumed
-plural on POST and unwrapped on GET/PUT.) Update is a `PUT` with a flat body
-of `role_id`/`admin_rights`/`languages` only (no `email`/`fullname`).
-
-```shell
-curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"contributors":[{"email":"you@example.com","role_id":5,"languages":[{"lang_iso":"fr","is_writable":true}]}]}' \
-  "https://api.lokalise.com/api2/projects/<project_id>/contributors" | jq 'keys'
-
-curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
-  "https://api.lokalise.com/api2/projects/<project_id>/contributors/<user_id>" | jq 'keys'
-```
-
-Expect `["contributor","project_id"]` for both.
-
-Observed:
-
-## 9. Contributor GET returns `role_id`
-
-Assumption: `role_id` is present (possibly `null`) on every contributor GET,
-not omitted when a contributor was created with `admin_rights` instead of a
-role.
-
-Observed:
-
-## 10. Duplicate contributor email — case-insensitivity
-
-Assumption: the real API de-duplicates contributor emails case-insensitively
-(the provider's own list-before-create check does `strings.EqualFold`, per
-`TestContributor_` case-insensitive-email coverage from Task 5). Confirm that
-adding `USER@Example.com` when `user@example.com` is already a contributor
-is rejected or treated as the same contributor by Lokalise, not created as a
-second one.
-
-Also note whether the API returns the email as sent or normalized (e.g.
-lowercased): `lokalise_contributor` keeps the configured email whenever the
-API's matches it case-insensitively, and never reads `fullname` back after
-create (the API reports an existing user's own name), so neither should
-cause a diff.
-
-Observed:
-
-## 11. Duplicate contributor status code
-
-Assumption: creating a contributor whose email is already on the project
-returns an error (status/body unconfirmed; not parsed by the provider).
-
-Observed (status code + body):
-
-## 12. `admin_rights` normalization/order
-
-Assumption: `admin_rights` values round-trip as configured; if the server
-reorders the array or normalizes casing/spelling, repeated applies with the
-same config must not show a diff (the provider should compare as sets, not
-ordered lists — confirm this is actually true against the live API, not just
-the fake).
-
-```hcl
-resource "lokalise_contributor" "check" {
-  project_id   = lokalise_project.check.id
-  email        = "you@example.com"
-  admin_rights = ["upload", "download"]
-  languages    = [{ lang_iso = "en", is_writable = true }]
-}
-```
-
-Apply, then run `terraform plan` again with no config change.
-
-Observed:
-
-## 13. Does deleting a contributor remove group-granted access?
-
-Assumption: unknown and not modeled. If a user has project access only
-because their group was assigned to the project (see #16), does
-`DELETE .../contributors/{user_id}` remove them, or does the group grant
-re-add them on the next sync? This affects whether `lokalise_contributor`
-and `lokalise_team_user_group_project` can safely coexist on the same
-project for the same user.
-
-Observed:
-
 ## 13a. Custom permission-template roles beyond the 5 built-ins
 
 Assumption: the fake always seeds the same 5 built-in roles (1 Manager,
@@ -482,19 +392,6 @@ curl -s -X PUT -H "X-Api-Token: $LOKALISE_API_TOKEN" -H 'Content-Type: applicati
 
 Observed:
 
-## 20. Does assigning a group to a project create contributors?
-
-Assumption: unknown. If `lokalise_team_user_group_project` (which calls
-`.../groups/{id}/projects/add`) causes Lokalise to implicitly add each group
-member as a contributor on that project, then a `lokalise_contributor`
-resource for the same user on the same project would collide with (or
-duplicate) group-granted access. Check whether `GET
-/projects/{id}/contributors` lists group members after assigning the group,
-and whether those members appear with a `role_id`/`admin_rights` of their
-own or only through group membership.
-
-Observed:
-
 ## 21. `GET /teams/{team_id}/users` role field
 
 Confirmed against the OpenAPI spec (not a guess), worth a live check: `role`
@@ -519,7 +416,7 @@ terraform apply -parallelism=10
 ```
 
 against a config with at least 10-15 resources (project + several languages
-+ several contributors). Watch for any `429` that surfaces as a Terraform
++ groups, a member and a group-project assignment). Watch for any `429` that surfaces as a Terraform
 error instead of being retried transparently.
 
 Observed:
@@ -570,25 +467,6 @@ curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
 
 Observed:
 
-## 26. Contributors with admin/all-language roles returning extra languages
-
-Assumption: a contributor's `languages` read back exactly as configured. If
-Lokalise grants admins or certain roles (e.g. Manager, or a template with
-`doesEnableAllReadOnlyLanguages`) every project language automatically,
-`GET .../contributors/{user_id}` may list languages that were never
-configured, and `lokalise_contributor` will show a perpetual diff on
-`languages`. Create a contributor with `role_id = 1` and one language on a
-project with several languages, then:
-
-```shell
-curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
-  "https://api.lokalise.com/api2/projects/<project_id>/contributors/<user_id>" | jq '.contributor.languages'
-```
-
-and run `terraform plan` with no config change.
-
-Observed:
-
 ## 27. `members/add` integer vs string user IDs
 
 Assumption: `PUT .../groups/{id}/members/add|remove` take
@@ -634,17 +512,149 @@ Behavior (not an assumption): the client retries a `POST` only on `429`. A
 `5xx` (e.g. a `502`/`504` from a gateway) or a dropped connection on a
 create is returned as an error immediately, because the create may have
 succeeded server-side and retrying would create a duplicate project, group,
-language or contributor. GET/PUT/DELETE still retry `5xx` and network
+language or group. GET/PUT/DELETE still retry `5xx` and network
 errors.
 
 If `terraform apply` fails on a create with a gateway/network error:
 
 1. Check the Lokalise UI (or list the relevant endpoint) for the
-   project/group/language/contributor the apply tried to create.
+   project/group/language the apply tried to create.
 2. If it exists, `terraform import` it (each resource's docs give the import
    ID format) instead of re-applying, which would fail with "already exists"
-   (languages, contributors, group members/projects) or create a duplicate
+   (languages, group members/projects) or create a duplicate
    (projects, groups).
 3. If it does not exist, re-run `terraform apply`.
 
 Observed (any gateway errors seen on create):
+
+---
+
+## Deferred with `lokalise_contributor`
+
+`lokalise_contributor` was removed from the provider: creating a contributor
+needs a second Lokalise user who is not the token owner. It lives on the
+`contributor-resource` branch. Run these items before bringing it back.
+The client's contributor methods are still in `internal/client` and the
+fake.
+
+### 8. Contributor response shape
+
+Assumption: a contributor object has `user_id`, `email`, `fullname`,
+`role_id` (nullable), `admin_rights` (`[]string`, or `{}` when empty),
+`languages` (`[]{lang_iso, is_writable}`). Create is a bulk POST
+`{"contributors":[{...}]}` returning the created contributor under a
+**singular** key, `{"project_id":.., "contributor":{...}}`; the client also
+accepts a plural `"contributors"` array. `GET` and `PUT
+.../contributors/{user_id}` return `{"project_id":.., "contributor":{...}}`.
+(All three envelopes fixed from the OpenAPI examples; previously assumed
+plural on POST and unwrapped on GET/PUT.) Update is a `PUT` with a flat body
+of `role_id`/`admin_rights`/`languages` only (no `email`/`fullname`).
+
+```shell
+curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"contributors":[{"email":"you@example.com","role_id":5,"languages":[{"lang_iso":"fr","is_writable":true}]}]}' \
+  "https://api.lokalise.com/api2/projects/<project_id>/contributors" | jq 'keys'
+
+curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
+  "https://api.lokalise.com/api2/projects/<project_id>/contributors/<user_id>" | jq 'keys'
+```
+
+Expect `["contributor","project_id"]` for both.
+
+Observed:
+
+### 9. Contributor GET returns `role_id`
+
+Assumption: `role_id` is present (possibly `null`) on every contributor GET,
+not omitted when a contributor was created with `admin_rights` instead of a
+role.
+
+Observed:
+
+### 10. Duplicate contributor email — case-insensitivity
+
+Assumption: the real API de-duplicates contributor emails case-insensitively
+(the provider's own list-before-create check does `strings.EqualFold`, per
+`TestContributor_` case-insensitive-email coverage from Task 5). Confirm that
+adding `USER@Example.com` when `user@example.com` is already a contributor
+is rejected or treated as the same contributor by Lokalise, not created as a
+second one.
+
+Also note whether the API returns the email as sent or normalized (e.g.
+lowercased): `lokalise_contributor` keeps the configured email whenever the
+API's matches it case-insensitively, and never reads `fullname` back after
+create (the API reports an existing user's own name), so neither should
+cause a diff.
+
+Observed:
+
+### 11. Duplicate contributor status code
+
+Assumption: creating a contributor whose email is already on the project
+returns an error (status/body unconfirmed; not parsed by the provider).
+
+Observed (status code + body):
+
+### 12. `admin_rights` normalization/order
+
+Assumption: `admin_rights` values round-trip as configured; if the server
+reorders the array or normalizes casing/spelling, repeated applies with the
+same config must not show a diff (the provider should compare as sets, not
+ordered lists — confirm this is actually true against the live API, not just
+the fake).
+
+```hcl
+resource "lokalise_contributor" "check" {
+  project_id   = lokalise_project.check.id
+  email        = "you@example.com"
+  admin_rights = ["upload", "download"]
+  languages    = [{ lang_iso = "en", is_writable = true }]
+}
+```
+
+Apply, then run `terraform plan` again with no config change.
+
+Observed:
+
+### 13. Does deleting a contributor remove group-granted access?
+
+Assumption: unknown and not modeled. If a user has project access only
+because their group was assigned to the project (see #16), does
+`DELETE .../contributors/{user_id}` remove them, or does the group grant
+re-add them on the next sync? This affects whether `lokalise_contributor`
+and `lokalise_team_user_group_project` can safely coexist on the same
+project for the same user.
+
+Observed:
+
+### 20. Does assigning a group to a project create contributors?
+
+Assumption: unknown. If `lokalise_team_user_group_project` (which calls
+`.../groups/{id}/projects/add`) causes Lokalise to implicitly add each group
+member as a contributor on that project, then a `lokalise_contributor`
+resource for the same user on the same project would collide with (or
+duplicate) group-granted access. Check whether `GET
+/projects/{id}/contributors` lists group members after assigning the group,
+and whether those members appear with a `role_id`/`admin_rights` of their
+own or only through group membership.
+
+Observed:
+
+### 26. Contributors with admin/all-language roles returning extra languages
+
+Assumption: a contributor's `languages` read back exactly as configured. If
+Lokalise grants admins or certain roles (e.g. Manager, or a template with
+`doesEnableAllReadOnlyLanguages`) every project language automatically,
+`GET .../contributors/{user_id}` may list languages that were never
+configured, and `lokalise_contributor` will show a perpetual diff on
+`languages`. Create a contributor with `role_id = 1` and one language on a
+project with several languages, then:
+
+```shell
+curl -s -H "X-Api-Token: $LOKALISE_API_TOKEN" \
+  "https://api.lokalise.com/api2/projects/<project_id>/contributors/<user_id>" | jq '.contributor.languages'
+```
+
+and run `terraform plan` with no config change.
+
+Observed:
