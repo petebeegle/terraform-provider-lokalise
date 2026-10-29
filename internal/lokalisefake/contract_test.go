@@ -70,7 +70,7 @@ func TestFake_MatchesOpenAPIExampleShapes(t *testing.T) {
 	contribGet := call("GET", "/projects/"+projectID+"/contributors/"+userID, nil)
 	contribUpdate := call("PUT", "/projects/"+projectID+"/contributors/"+userID, map[string]any{"role_id": 1, "languages": []any{map[string]any{"lang_iso": "en", "is_writable": true}}})
 
-	groupBody := map[string]any{"name": "g", "role_id": 1, "languages": map[string]any{"reference": []int64{}, "contributable": []int64{640}}}
+	groupBody := map[string]any{"name": "g", "role_id": 1, "languages": map[string]any{"reference": []int64{640}, "contributable": []int64{640}}}
 	groupCreate := call("POST", "/teams/"+teamStr+"/groups", groupBody)
 	groupID := strconv.FormatInt(int64(groupCreate["group"].(map[string]any)["group_id"].(float64)), 10)
 	groupGet := call("GET", "/teams/"+teamStr+"/groups/"+groupID, nil)
@@ -152,8 +152,8 @@ func TestFake_MatchesOpenAPIExampleShapes(t *testing.T) {
 	if v, ok := groupGet["admin_rights"]; ok {
 		t.Errorf("group GET has top-level admin_rights %v; the example nests it under permissions", v)
 	}
-	if v := groupCreate["group"].(map[string]any)["permissions"].(map[string]any)["admin_rights"]; fmt.Sprint(v) != "map[]" {
-		t.Errorf("empty group admin_rights = %#v, want {}", v)
+	if v := groupCreate["group"].(map[string]any)["members"]; fmt.Sprint(v) != "map[]" {
+		t.Errorf("empty group members = %#v, want {}", v)
 	}
 }
 

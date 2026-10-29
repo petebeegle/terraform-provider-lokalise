@@ -98,12 +98,20 @@ func (s *Server) handleCreateLanguages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Per-language failures are reported in an "errors" array of a 200
+	// response, not as an HTTP error (observed live).
 	created := make([]languageJSON, 0, len(body.Languages))
+	langErrors := []languageErrorJSON{}
+languages:
 	for _, in := range body.Languages {
 		for _, existing := range s.languages[projectID] {
 			if existing.LangISO == in.LangISO {
-				writeError(w, http.StatusBadRequest, "language "+in.LangISO+" already exists in project "+projectID)
-				return
+				langErrors = append(langErrors, languageErrorJSON{
+					Message: "Language is already added to the project",
+					Code:    208,
+					LangISO: in.LangISO,
+				})
+				continue languages
 			}
 		}
 		l := newLanguage(in.LangISO)
@@ -120,7 +128,16 @@ func (s *Server) handleCreateLanguages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"project_id": projectID,
 		"languages":  created,
+		"errors":     langErrors,
 	})
+}
+
+// languageErrorJSON is one entry of a language create response's "errors"
+// array.
+type languageErrorJSON struct {
+	Message string `json:"message"`
+	Code    int    `json:"code"`
+	LangISO string `json:"lang_iso"`
 }
 
 func (s *Server) handleGetLanguage(w http.ResponseWriter, r *http.Request) {
@@ -172,18 +189,13 @@ func (s *Server) handleDeleteLanguage(w http.ResponseWriter, r *http.Request) {
 	defer s.mu.Unlock()
 
 	projectID := r.PathValue("project_id")
-	p, ok := s.projects[projectID]
-	if !ok {
+	if _, ok := s.projects[projectID]; !ok {
 		writeNotFound(w)
 		return
 	}
 	l, ok := s.findLanguageLocked(projectID, r.PathValue("language_id"))
 	if !ok {
 		writeNotFound(w)
-		return
-	}
-	if l.LangID == p.BaseLanguageID {
-		writeError(w, http.StatusBadRequest, "cannot delete the project's base language")
 		return
 	}
 	s.deleteLanguageLocked(projectID, l.LangID)

@@ -6,6 +6,7 @@ package client_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -81,12 +82,20 @@ func TestLanguages_CreateDuplicateRejected(t *testing.T) {
 		t.Fatalf("CreateProject() error = %v", err)
 	}
 
-	if _, err := c.CreateLanguage(ctx, p.ID, client.CreateLanguageInput{ISO: "en"}); err == nil {
-		t.Fatal("CreateLanguage() error = nil, want error for duplicate base language")
+	_, err = c.CreateLanguage(ctx, p.ID, client.CreateLanguageInput{ISO: "en"})
+	var apiErr *client.APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("CreateLanguage() error = %v, want *client.APIError for duplicate base language", err)
+	}
+	if apiErr.StatusCode != 208 || apiErr.Message != "Language is already added to the project" {
+		t.Fatalf("CreateLanguage() error = %+v, want the API's 208 message", apiErr)
 	}
 }
 
-func TestLanguages_DeleteBaseLanguageRejected(t *testing.T) {
+// TestLanguages_DeleteBaseLanguageAllowed pins the live API's behaviour:
+// it deletes a project's base language without complaint, which is why
+// lokalise_project_language never calls DELETE for the base language.
+func TestLanguages_DeleteBaseLanguageAllowed(t *testing.T) {
 	ctx := context.Background()
 	fake := lokalisefake.New(t)
 	c := client.New(fake.URL(), "tok", client.WithRateLimit(1000, 1000))
@@ -110,8 +119,8 @@ func TestLanguages_DeleteBaseLanguageRejected(t *testing.T) {
 		t.Fatalf("base language en not found in %+v", langs)
 	}
 
-	if err := c.DeleteLanguage(ctx, p.ID, baseID); err == nil {
-		t.Fatal("DeleteLanguage() error = nil, want error for base language")
+	if err := c.DeleteLanguage(ctx, p.ID, baseID); err != nil {
+		t.Fatalf("DeleteLanguage() error = %v, want nil for base language", err)
 	}
 }
 

@@ -68,8 +68,17 @@ type createLanguagesRequest struct {
 	Languages []createLanguageWire `json:"languages"`
 }
 
+// createLanguagesResponse is the POST .../languages response. A language
+// the API refuses (already added, unknown ISO code) is reported in Errors
+// of a 200 response, not as an HTTP error.
 type createLanguagesResponse struct {
-	Languages []languageWire `json:"languages"`
+	Languages []languageWire        `json:"languages"`
+	Errors    []createLanguageError `json:"errors"`
+}
+
+type createLanguageError struct {
+	Message string `json:"message"`
+	Code    int    `json:"code"`
 }
 
 type updateLanguageRequest struct {
@@ -109,6 +118,9 @@ func (c *HTTPClient) CreateLanguage(ctx context.Context, projectID string, in Cr
 	var out createLanguagesResponse
 	if _, err := c.do(ctx, http.MethodPost, languagesPath(projectID), nil, req, &out); err != nil {
 		return nil, err
+	}
+	if len(out.Errors) > 0 {
+		return nil, &APIError{StatusCode: out.Errors[0].Code, Message: out.Errors[0].Message}
 	}
 	if len(out.Languages) == 0 {
 		return nil, fmt.Errorf("lokalise: create language: empty response")

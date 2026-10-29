@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -17,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
@@ -95,13 +97,13 @@ func (r *TeamUserGroupResource) Schema(ctx context.Context, req resource.SchemaR
 				Optional:            true,
 			},
 			"admin_rights": schema.SetAttribute{
-				MarkdownDescription: "Explicit set of admin rights to assign. Conflicts with `role_id`; exactly one of the two must be set.",
+				MarkdownDescription: "Explicit set of admin rights to assign. Conflicts with `role_id`; exactly one of the two must be set. Lokalise adds rights of its own (e.g. `branches_main_modify`); those don't cause a diff, but a configured right missing from the group does.",
 				ElementType:         types.StringType,
 				Optional:            true,
 			},
 			"languages": schema.SingleNestedAttribute{
-				MarkdownDescription: "Languages this group may access, as system language ISO codes.",
-				Optional:            true,
+				MarkdownDescription: "Languages this group may access, as system language ISO codes. Lokalise rejects a group without at least one contributable language.",
+				Required:            true,
 				Attributes: map[string]schema.Attribute{
 					"reference": schema.SetAttribute{
 						MarkdownDescription: "Languages the group may view but not translate.",
@@ -109,9 +111,12 @@ func (r *TeamUserGroupResource) Schema(ctx context.Context, req resource.SchemaR
 						Optional:            true,
 					},
 					"contributable": schema.SetAttribute{
-						MarkdownDescription: "Languages the group may translate.",
+						MarkdownDescription: "Languages the group may translate. At least one is required.",
 						ElementType:         types.StringType,
-						Optional:            true,
+						Required:            true,
+						Validators: []validator.Set{
+							setvalidator.SizeAtLeast(1),
+						},
 					},
 				},
 			},
@@ -344,7 +349,7 @@ func (m *TeamUserGroupResourceModel) applyGroup(ctx context.Context, teamID int6
 		m.AdminRights = types.SetNull(types.StringType)
 	} else {
 		m.RoleID = types.Int64Null()
-		rights, d := types.SetValueFrom(ctx, types.StringType, g.AdminRights)
+		rights, d := types.SetValueFrom(ctx, types.StringType, configuredRightsIfGranted(ctx, m.AdminRights, g.AdminRights))
 		diags.Append(d...)
 		m.AdminRights = rights
 	}
@@ -487,4 +492,30 @@ func idsToISOSet(ctx context.Context, ids []int64, idToISO map[int64]string, pri
 	set, d := types.SetValueFrom(ctx, types.StringType, isos)
 	diags.Append(d...)
 	return set, diags
+}
+
+// configuredRightsIfGranted returns the admin rights to store in state.
+// Lokalise adds rights of its own to a group (e.g. branches_main_modify), so
+// when the API's rights include every configured right, the configured set
+// is kept and the additions don't show as a diff. Otherwise (a configured
+// right was removed, or nothing is configured yet, as on import) the API's
+// rights are returned.
+func configuredRightsIfGranted(ctx context.Context, configured types.Set, granted []string) []string {
+	if configured.IsNull() || configured.IsUnknown() {
+		return granted
+	}
+	var want []string
+	if diags := configured.ElementsAs(ctx, &want, false); diags.HasError() {
+		return granted
+	}
+	have := make(map[string]bool, len(granted))
+	for _, r := range granted {
+		have[r] = true
+	}
+	for _, r := range want {
+		if !have[r] {
+			return granted
+		}
+	}
+	return want
 }

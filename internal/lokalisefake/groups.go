@@ -19,7 +19,7 @@ type systemLanguageJSON struct {
 var defaultSystemLanguages = []systemLanguageJSON{
 	{LangID: 640, LangISO: "en"},
 	{LangID: 673, LangISO: "fr"},
-	{LangID: 597, LangISO: "de"},
+	{LangID: 666, LangISO: "de"},
 }
 
 // groupLanguageJSON is the wire shape of one entry of a group's
@@ -74,21 +74,62 @@ func (g *group) toJSON() groupJSON {
 // groupLanguagesRequestJSON is the "languages" field of the create/update
 // request body: two arrays of system language IDs (not the flat
 // {lang_id, is_writable} shape the GET response nests under
-// permissions.languages).
+// permissions.languages). Pointers tell a missing array from an empty one.
 type groupLanguagesRequestJSON struct {
-	Reference     []int64 `json:"reference"`
-	Contributable []int64 `json:"contributable"`
+	Reference     *[]int64 `json:"reference"`
+	Contributable *[]int64 `json:"contributable"`
 }
 
-func (l groupLanguagesRequestJSON) toGroupLanguages() []groupLanguage {
-	langs := make([]groupLanguage, 0, len(l.Reference)+len(l.Contributable))
-	for _, id := range l.Reference {
-		langs = append(langs, groupLanguage{LangID: id, IsWritable: false})
+// validationError returns the live API's 400 message for a languages field
+// it rejects, or "" if the field is accepted. Observed live: reference must
+// be a non-empty array, and contributable must be present (it may be empty).
+func (l groupLanguagesRequestJSON) validationError() string {
+	if l.Reference == nil || len(*l.Reference) == 0 {
+		return "Invalid `languages`.`reference` parameter"
 	}
-	for _, id := range l.Contributable {
+	if l.Contributable == nil {
+		return "Invalid `languages`.`contributable` parameter"
+	}
+	return ""
+}
+
+// toGroupLanguages flattens the request into the group's language list. A
+// language in both arrays is stored once, as contributable. Observed live:
+// a create with an empty contributable array stores no languages at all,
+// while an update stores the reference languages.
+func (l groupLanguagesRequestJSON) toGroupLanguages(isCreate bool) []groupLanguage {
+	contributable := *l.Contributable
+	if isCreate && len(contributable) == 0 {
+		return nil
+	}
+	langs := make([]groupLanguage, 0, len(*l.Reference)+len(contributable))
+	isContributable := map[int64]bool{}
+	for _, id := range contributable {
+		isContributable[id] = true
 		langs = append(langs, groupLanguage{LangID: id, IsWritable: true})
 	}
+	for _, id := range *l.Reference {
+		if !isContributable[id] {
+			langs = append(langs, groupLanguage{LangID: id, IsWritable: false})
+		}
+	}
 	return langs
+}
+
+// impliedAdminRight is added by the live API to every group's admin_rights,
+// whether the group was given a role_id or an explicit admin_rights list.
+const impliedAdminRight = "branches_main_modify"
+
+// withImpliedAdminRight returns rights plus impliedAdminRight, as the live
+// API stores them.
+func withImpliedAdminRight(rights []string) []string {
+	out := append([]string(nil), rights...)
+	for _, r := range out {
+		if r == impliedAdminRight {
+			return out
+		}
+	}
+	return append(out, impliedAdminRight)
 }
 
 type groupRequestBody struct {
@@ -125,6 +166,10 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &body) {
 		return
 	}
+	if msg := body.Languages.validationError(); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
 
 	teamID, err := strconv.ParseInt(r.PathValue("team_id"), 10, 64)
 	if err != nil {
@@ -141,8 +186,8 @@ func (s *Server) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		TeamID:      teamID,
 		Name:        body.Name,
 		RoleID:      body.RoleID,
-		AdminRights: append([]string(nil), body.AdminRights...),
-		Languages:   body.Languages.toGroupLanguages(),
+		AdminRights: withImpliedAdminRight(body.AdminRights),
+		Languages:   body.Languages.toGroupLanguages(true),
 	}
 	s.groups[teamID] = append(s.groups[teamID], g)
 
@@ -167,6 +212,10 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &body) {
 		return
 	}
+	if msg := body.Languages.validationError(); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -181,8 +230,8 @@ func (s *Server) handleUpdateGroup(w http.ResponseWriter, r *http.Request) {
 	// untouched.
 	g.Name = body.Name
 	g.RoleID = body.RoleID
-	g.AdminRights = append([]string(nil), body.AdminRights...)
-	g.Languages = body.Languages.toGroupLanguages()
+	g.AdminRights = withImpliedAdminRight(body.AdminRights)
+	g.Languages = body.Languages.toGroupLanguages(false)
 
 	writeJSON(w, http.StatusOK, groupEnvelope{TeamID: g.TeamID, Group: g.toJSON()})
 }
@@ -250,6 +299,19 @@ func (s *Server) DeleteGroupOutOfBand(teamID, groupID int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.deleteGroupLocked(teamID, groupID)
+}
+
+// SetGroupAdminRightsOutOfBand replaces a group's admin rights, as if
+// changed in the Lokalise UI, bypassing the HTTP handler. The request is not
+// logged.
+func (s *Server) SetGroupAdminRightsOutOfBand(teamID, groupID int64, rights []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, g := range s.groups[teamID] {
+		if g.GroupID == groupID {
+			g.AdminRights = append([]string(nil), rights...)
+		}
+	}
 }
 
 // AddGroupMemberOutOfBand adds userID to a group's member list, as if added

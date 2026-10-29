@@ -262,14 +262,14 @@ func TestTeamUserGroup_ImportBadID(t *testing.T) {
 	})
 }
 
-// TestTeamUserGroup_EmptyLanguagesForms asserts that configured empty forms
-// of `languages` (an empty object, or an empty set alongside a non-empty
-// one) round-trip without "inconsistent result" errors or a perpetual diff.
-func TestTeamUserGroup_EmptyLanguagesForms(t *testing.T) {
+// TestTeamUserGroup_EmptyReferenceRoundTrips asserts that an omitted or
+// empty `reference` set round-trips without "inconsistent result" errors or
+// a perpetual diff, even though the client sends the contributable
+// languages as reference (the live API rejects an empty reference array).
+func TestTeamUserGroup_EmptyReferenceRoundTrips(t *testing.T) {
 	for name, languages := range map[string]string{
-		"empty object":    `languages = {}`,
-		"empty reference": `languages = { reference = [], contributable = ["en"] }`,
-		"both empty":      `languages = { reference = [], contributable = [] }`,
+		"omitted reference": `languages = { contributable = ["en"] }`,
+		"empty reference":   `languages = { reference = [], contributable = ["en"] }`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			fake := lokalisefake.New(t)
@@ -294,4 +294,79 @@ func TestTeamUserGroup_EmptyLanguagesForms(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestTeamUserGroup_RequiresContributableLanguage asserts that configs the
+// live API would reject (no contributable language) fail at plan time.
+func TestTeamUserGroup_RequiresContributableLanguage(t *testing.T) {
+	for name, tc := range map[string]struct {
+		languages string
+		wantErr   string
+	}{
+		"languages omitted":   {``, `(?s)"languages" is\s+required`},
+		"empty object":        {`languages = {}`, `(?s)"contributable" is\s+required`},
+		"empty contributable": {`languages = { reference = ["en"], contributable = [] }`, `(?s)set must contain at least 1`},
+		"both empty":          {`languages = { reference = [], contributable = [] }`, `(?s)set must contain at least 1`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fake := lokalisefake.New(t)
+			config := providerConfig(fake.URL()) + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Translators", "role_id = 5", tc.languages)
+
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: testProviderFactories,
+				Steps: []resource.TestStep{
+					{
+						Config:      config,
+						ExpectError: regexp.MustCompile(tc.wantErr),
+					},
+				},
+			})
+		})
+	}
+}
+
+// TestTeamUserGroup_AdminRightsAddedByAPI asserts that rights Lokalise adds
+// on its own (branches_main_modify) don't cause "inconsistent result" errors
+// or a diff, while a configured right removed out of band does.
+func TestTeamUserGroup_AdminRightsAddedByAPI(t *testing.T) {
+	fake := lokalisefake.New(t)
+	config := providerConfig(fake.URL()) + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Uploaders", `admin_rights = ["upload"]`,
+		`languages = { contributable = ["en"] }`)
+
+	var groupID int64
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PostApplyPostRefresh: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					stateValue(teamUserGroupAddr, "admin_rights", knownvalue.SetExact([]knownvalue.Check{
+						knownvalue.StringExact("upload"),
+					})),
+				},
+				Check: func(s *terraform.State) error {
+					rs, err := teamUserGroupState(s)
+					if err != nil {
+						return err
+					}
+					groupID, err = strconv.ParseInt(rs.Primary.Attributes["group_id"], 10, 64)
+					return err
+				},
+			},
+			{
+				PreConfig: func() {
+					fake.SetGroupAdminRightsOutOfBand(lokalisefake.DefaultTeamID, groupID, []string{"branches_main_modify"})
+				},
+				Config: config,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(teamUserGroupAddr, plancheck.ResourceActionUpdate),
+					},
+				},
+			},
+		},
+	})
 }

@@ -31,6 +31,10 @@ resource "lokalise_team_user_group" "test" {
   team_id = %d
   name    = "Translators"
   role_id = 5
+
+  languages = {
+    contributable = ["fr"]
+  }
 }
 
 resource "lokalise_team_user_group_project" "test" {
@@ -102,6 +106,10 @@ resource "lokalise_team_user_group" "test" {
   team_id = %d
   name    = "Translators"
   role_id = 5
+
+  languages = {
+    contributable = ["fr"]
+  }
 }
 `, lokalisefake.DefaultTeamID),
 				Check: func(s *terraform.State) error {

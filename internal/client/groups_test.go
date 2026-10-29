@@ -33,8 +33,8 @@ func TestSystemLanguages_List(t *testing.T) {
 	if byISO["fr"] != 673 {
 		t.Fatalf("fr = %d, want 673", byISO["fr"])
 	}
-	if byISO["de"] != 597 {
-		t.Fatalf("de = %d, want 597", byISO["de"])
+	if byISO["de"] != 666 {
+		t.Fatalf("de = %d, want 666", byISO["de"])
 	}
 }
 
@@ -133,6 +133,44 @@ func TestCreateGroup_EmptyLanguagesSentAsArrays(t *testing.T) {
 			if !ok || len(v) != 0 {
 				t.Fatalf("languages.%s = %#v, want []", key, langs[key])
 			}
+		}
+	}
+}
+
+// TestGroupRequest_EmptyReferenceSentAsContributable asserts that a group
+// with contributable languages but no reference languages sends the
+// contributable languages as "reference" too, on create and update: the
+// live API rejects an empty reference array.
+func TestGroupRequest_EmptyReferenceSentAsContributable(t *testing.T) {
+	ctx := context.Background()
+
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Errorf("decode request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"team_id":100,"group":{"group_id":1,"team_id":100,"name":"g","permissions":{}}}`))
+	}))
+	defer srv.Close()
+
+	c := client.New(srv.URL, "tok", client.WithRateLimit(1000, 1000))
+	roleID := int64(5)
+	in := client.GroupInput{Name: "g", RoleID: &roleID, Languages: client.GroupLanguages{Contributable: []int64{673}}}
+	for _, call := range []func() error{
+		func() error { _, err := c.CreateGroup(ctx, 100, in); return err },
+		func() error { _, err := c.UpdateGroup(ctx, 100, 1, in); return err },
+	} {
+		if err := call(); err != nil {
+			t.Fatalf("call error = %v", err)
+		}
+		langs, _ := gotBody["languages"].(map[string]any)
+		gotReference, _ := langs["reference"].([]any)
+		gotContributable, _ := langs["contributable"].([]any)
+		want := []any{float64(673)}
+		if !equalAnySlices(gotReference, want) || !equalAnySlices(gotContributable, want) {
+			t.Fatalf("languages = %+v, want reference and contributable both %v", langs, want)
 		}
 	}
 }
@@ -283,7 +321,7 @@ func TestGroupMembers_AddRemove(t *testing.T) {
 	fake := lokalisefake.New(t)
 	c := client.New(fake.URL(), "tok", client.WithRateLimit(1000, 1000))
 
-	created, err := c.CreateGroup(ctx, lokalisefake.DefaultTeamID, client.GroupInput{Name: "G"})
+	created, err := c.CreateGroup(ctx, lokalisefake.DefaultTeamID, client.GroupInput{Name: "G", Languages: client.GroupLanguages{Contributable: []int64{640}}})
 	if err != nil {
 		t.Fatalf("CreateGroup() error = %v", err)
 	}
@@ -326,7 +364,7 @@ func TestGroupProjects_AddRemove(t *testing.T) {
 	fake := lokalisefake.New(t)
 	c := client.New(fake.URL(), "tok", client.WithRateLimit(1000, 1000))
 
-	created, err := c.CreateGroup(ctx, lokalisefake.DefaultTeamID, client.GroupInput{Name: "G"})
+	created, err := c.CreateGroup(ctx, lokalisefake.DefaultTeamID, client.GroupInput{Name: "G", Languages: client.GroupLanguages{Contributable: []int64{640}}})
 	if err != nil {
 		t.Fatalf("CreateGroup() error = %v", err)
 	}

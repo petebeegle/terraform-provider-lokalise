@@ -143,9 +143,18 @@ type groupLanguagesRequestWire struct {
 
 // groupLanguagesRequest builds the request "languages" field, sending an
 // empty array (never null) for an empty set.
+//
+// The live API rejects an empty reference array with a 400, so an empty
+// Reference is sent as the contributable languages instead. That grants
+// nothing extra: a contributable language is already readable, and the API
+// stores a language listed in both arrays once, as contributable.
 func groupLanguagesRequest(langs GroupLanguages) groupLanguagesRequestWire {
+	reference := langs.Reference
+	if len(reference) == 0 {
+		reference = langs.Contributable
+	}
 	return groupLanguagesRequestWire{
-		Reference:     append([]int64{}, langs.Reference...),
+		Reference:     append([]int64{}, reference...),
 		Contributable: append([]int64{}, langs.Contributable...),
 	}
 }

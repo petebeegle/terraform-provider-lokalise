@@ -42,13 +42,13 @@ resource "lokalise_team_user_group" "french_translators" {
 
 ### Required
 
+- `languages` (Attributes) Languages this group may access, as system language ISO codes. Lokalise rejects a group without at least one contributable language. (see [below for nested schema](#nestedatt--languages))
 - `name` (String) Group name.
 - `team_id` (Number) Lokalise team ID. Changing it forces a new resource.
 
 ### Optional
 
-- `admin_rights` (Set of String) Explicit set of admin rights to assign. Conflicts with `role_id`; exactly one of the two must be set.
-- `languages` (Attributes) Languages this group may access, as system language ISO codes. (see [below for nested schema](#nestedatt--languages))
+- `admin_rights` (Set of String) Explicit set of admin rights to assign. Conflicts with `role_id`; exactly one of the two must be set. Lokalise adds rights of its own (e.g. `branches_main_modify`); those don't cause a diff, but a configured right missing from the group does.
 - `role_id` (Number) Permission template ID to assign (see `lokalise_permission_template`). Conflicts with `admin_rights`; exactly one of the two must be set.
 
 ### Read-Only
@@ -59,9 +59,12 @@ resource "lokalise_team_user_group" "french_translators" {
 <a id="nestedatt--languages"></a>
 ### Nested Schema for `languages`
 
+Required:
+
+- `contributable` (Set of String) Languages the group may translate. At least one is required.
+
 Optional:
 
-- `contributable` (Set of String) Languages the group may translate.
 - `reference` (Set of String) Languages the group may view but not translate.
 
 ## Import
