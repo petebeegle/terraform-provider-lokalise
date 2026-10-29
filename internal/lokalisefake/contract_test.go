@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/petebeegle/lokalise-provider/internal/lokalisefake"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/lokalisefake"
 )
 
 // TestFake_MatchesOpenAPIExampleShapes asserts that the fake's responses

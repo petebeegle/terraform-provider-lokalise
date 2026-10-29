@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/petebeegle/lokalise-provider/internal/client"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/client"
 )
 
 const defaultProjectType = "localization_files"

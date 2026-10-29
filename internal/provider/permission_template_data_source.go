@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/petebeegle/lokalise-provider/internal/client"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/client"
 )
 
 var (

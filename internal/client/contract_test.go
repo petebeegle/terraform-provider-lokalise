@@ -14,7 +14,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/petebeegle/lokalise-provider/internal/client"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/client"
 )
 
 // The tests in this file are contract tests: each serves a response example

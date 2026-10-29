@@ -19,7 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/petebeegle/lokalise-provider/internal/client"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/client"
 )
 
 var (

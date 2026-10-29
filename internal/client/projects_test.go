@@ -8,8 +8,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/petebeegle/lokalise-provider/internal/client"
-	"github.com/petebeegle/lokalise-provider/internal/lokalisefake"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/client"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/lokalisefake"
 )
 
 func TestProjects_CRUD(t *testing.T) {

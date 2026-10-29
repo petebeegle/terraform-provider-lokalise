@@ -16,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
-	"github.com/petebeegle/lokalise-provider/internal/lokalisefake"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/lokalisefake"
 )
 
 const contributorAddr = "lokalise_contributor.test"

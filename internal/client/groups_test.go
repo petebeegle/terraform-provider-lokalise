@@ -10,8 +10,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/petebeegle/lokalise-provider/internal/client"
-	"github.com/petebeegle/lokalise-provider/internal/lokalisefake"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/client"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/lokalisefake"
 )
 
 func TestSystemLanguages_List(t *testing.T) {

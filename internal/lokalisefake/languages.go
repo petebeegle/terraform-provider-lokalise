@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/petebeegle/lokalise-provider/internal/client"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/client"
 )
 
 // languageJSON is the wire shape of a language (OpenAPI "Languages" schema,

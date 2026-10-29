@@ -16,8 +16,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
-	"github.com/petebeegle/lokalise-provider/internal/client"
-	"github.com/petebeegle/lokalise-provider/internal/lokalisefake"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/client"
+	"github.com/petebeegle/terraform-provider-lokalise/internal/lokalisefake"
 )
 
 const teamUserGroupAddr = "lokalise_team_user_group.test"

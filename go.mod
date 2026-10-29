@@ -1,4 +1,4 @@
-module github.com/petebeegle/lokalise-provider
+module github.com/petebeegle/terraform-provider-lokalise
 
 go 1.25.8
 
