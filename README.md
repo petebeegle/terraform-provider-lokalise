@@ -85,7 +85,7 @@ produces an empty plan.
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.25 (for building from source)
+- [Go](https://golang.org/doc/install) >= 1.26 (for building from source)
 - A Lokalise API token (`LOKALISE_API_TOKEN`). Groups, roles and team-user
   lookups need a team Admin.
 

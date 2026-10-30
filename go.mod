@@ -1,13 +1,13 @@
 module github.com/petebeegle/terraform-provider-lokalise
 
-go 1.25.8
+go 1.26.0
 
 require (
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
 	github.com/hashicorp/terraform-plugin-go v0.31.0
 	github.com/hashicorp/terraform-plugin-testing v1.16.0
-	golang.org/x/time v0.9.0
+	golang.org/x/time v0.16.0
 )
 
 require (
