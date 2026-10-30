@@ -1,64 +1,158 @@
-# Terraform Provider Scaffolding (Terraform Plugin Framework)
+# Terraform Provider for Lokalise
 
-_This template repository is built on the [Terraform Plugin Framework](https://github.com/hashicorp/terraform-plugin-framework). The template repository built on the [Terraform Plugin SDK](https://github.com/hashicorp/terraform-plugin-sdk) can be found at [terraform-provider-scaffolding](https://github.com/hashicorp/terraform-provider-scaffolding). See [Which SDK Should I Use?](https://developer.hashicorp.com/terraform/plugin/framework-benefits) in the Terraform documentation for additional information._
+A Terraform provider for managing [Lokalise](https://lokalise.com) projects,
+project languages, and team user groups (permissions, members, project
+assignments) — the setup otherwise done by hand in the Lokalise UI.
+Project access is granted through groups: a group's role and languages,
+its members, and the projects assigned to it.
 
-This repository is a *template* for a [Terraform](https://www.terraform.io) provider. It is intended as a starting point for creating Terraform providers, containing:
+## What this provider manages
 
-- A resource and a data source (`internal/provider/`),
-- Examples (`examples/`) and generated documentation (`docs/`),
-- Miscellaneous meta files.
+- `lokalise_project` — a project (name, description, team, type, base
+  language).
+- `lokalise_project_language` — a language added to a project.
+- `lokalise_team_user_group` — a team user group's own fields (name, role /
+  `admin_rights`, language grants).
+- `lokalise_team_user_group_member` — one user's membership in a group.
+- `lokalise_team_user_group_project` — one project assigned to a group.
+- `lokalise_permission_template` (data source) — look up a team's built-in
+  or custom role by name, to avoid hard-coding `role_id`.
+- `lokalise_team_user` (data source) — look up a team user by email, to feed
+  `lokalise_team_user_group_member`.
 
-These files contain boilerplate code that you will need to edit to create your own Terraform provider. Tutorials for creating Terraform providers can be found on the [HashiCorp Developer](https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework) platform. _Terraform Plugin Framework specific guides are titled accordingly._
+Every resource is importable, so existing hand-made projects can be adopted
+into Terraform.
 
-Please see the [GitHub template repository documentation](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template) for how to create a new repository from this template on GitHub.
+### What it does not manage (non-goals)
 
-Once you've written your provider, you'll want to [publish it on the Terraform Registry](https://developer.hashicorp.com/terraform/registry/providers/publishing) so that others can use it.
+- Automations and apps/integrations — no public Lokalise API.
+- Project `settings` (reviewing, branching, per-platform key names) — the
+  API only exposes these read-only.
+- Keys, translations, files, screenshots, glossary — content, not setup.
+- Webhooks.
+- Per-project contributors. Grant access through a group instead
+  (`lokalise_team_user_group` + `_member` + `_project`); one-off contributors
+  stay in the UI. A `lokalise_contributor` resource exists on the
+  `contributor-resource` branch but is unverified against the live API,
+  which needs a second Lokalise user to test.
+- Creating or inviting team users directly — no such API exists. A user
+  must already be on the team before `lokalise_team_user_group_member` can
+  add them to a group.
+
+### Non-authoritative
+
+This provider is **non-authoritative**: no resource removes anything it did
+not create itself. One resource instance manages exactly one item (one
+language, one group member, one group-project assignment).
+Declaring a `lokalise_team_user_group_member` for Alice never removes other
+members the UI or another team added by hand; destroying that resource
+removes only Alice. If you want a resource gone, you must
+explicitly destroy it — nothing is pruned implicitly by omission from
+config.
+
+### `deletion_protection`
+
+`lokalise_project` and `lokalise_project_language` both have a
+`deletion_protection` attribute, `optional`, computed, **default `true`**.
+While `true`, `terraform destroy` (or a replace that would destroy the
+resource) fails with an error and makes no API call — it does not delete
+the project or language. Set it to `false` and `apply` that change first,
+then destroy. Imported resources always come in with
+`deletion_protection = true`, so adopting an existing project can never
+accidentally make it destroyable without an explicit, separate step.
+
+This exists because deleting a project or a language deletes its
+translation data, which is usually the most expensive mistake a
+`terraform destroy` can make.
+
+### Importing existing projects
+
+Every resource supports `terraform import`:
+
+```shell
+terraform import lokalise_project.example <project_id>
+terraform import lokalise_project_language.example <project_id>:<lang_iso>
+terraform import lokalise_team_user_group.example <team_id>:<group_id>
+terraform import lokalise_team_user_group_member.example <team_id>:<group_id>:<user_id>
+terraform import lokalise_team_user_group_project.example <team_id>:<group_id>:<project_id>
+```
+
+See each resource's generated doc under `docs/resources/` for its exact
+import ID and an example. After importing a project or a project language,
+`deletion_protection` comes in as `true`; a config that omits the attribute
+produces an empty plan.
 
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.24
+- [Go](https://golang.org/doc/install) >= 1.25 (for building from source)
+- A Lokalise API token (`LOKALISE_API_TOKEN`). Groups, roles and team-user
+  lookups need a team Admin.
 
-## Building the Provider
+## Configuration
 
-1. Clone the repository
-1. Enter the repository directory
-1. Build the provider using the Go `install` command:
+```hcl
+terraform {
+  required_providers {
+    lokalise = {
+      source = "petebeegle/lokalise"
+    }
+  }
+}
 
-```shell
-go install
+# Reads the API token from the LOKALISE_API_TOKEN environment variable.
+provider "lokalise" {}
 ```
 
-## Adding Dependencies
+- `token` (sensitive, optional): falls back to the `LOKALISE_API_TOKEN`
+  environment variable. Configuration fails at `terraform plan`/`apply` if
+  neither is set.
+- `api_url` (optional): defaults to `https://api.lokalise.com/api2`.
 
-This provider uses [Go modules](https://github.com/golang/go/wiki/Modules).
-Please see the Go documentation for the most up to date information about using Go modules.
+Then `terraform init` installs it from the
+[Terraform Registry](https://registry.terraform.io/providers/petebeegle/lokalise).
 
-To add a new dependency `github.com/author/dependency` to your Terraform provider:
+## Building and running locally (`dev_overrides`)
 
-```shell
-go get github.com/author/dependency
-go mod tidy
-```
-
-Then commit the changes to `go.mod` and `go.sum`.
-
-## Using the Provider
-
-Fill this in for each provider
-
-## Developing the Provider
-
-If you wish to work on the provider, you'll first need [Go](http://www.golang.org) installed on your machine (see [Requirements](#requirements) above).
-
-To compile the provider, run `go install`. This will build the provider and put the provider binary in the `$GOPATH/bin` directory.
-
-To generate or update documentation, run `make generate`.
-
-In order to run the full suite of Acceptance tests, run `make testacc`.
-
-*Note:* Acceptance tests create real resources, and often cost money to run.
+To use a locally built binary instead of the registry release, use Terraform's
+[`dev_overrides`](https://developer.hashicorp.com/terraform/cli/config/config-file#development-overrides-for-provider-developers):
 
 ```shell
-make testacc
+go install .
 ```
+
+Add to `~/.terraformrc`:
+
+```hcl
+provider_installation {
+  dev_overrides {
+    "petebeegle/lokalise" = "<GOBIN>"
+  }
+
+  direct {}
+}
+```
+
+Replace `<GOBIN>` with the output of `go env GOBIN` (or `$(go env GOPATH)/bin`
+if `GOBIN` is unset). With `dev_overrides` active, Terraform uses this local
+binary for every `lokalise` provider block and skips `terraform init`'s
+provider installation for it — remove the block to go back to a normal
+registry install.
+
+## Developing the provider
+
+```shell
+go build ./...
+go vet ./...
+make test       # go test ./... — unit tests only, against an in-process
+                # fake Lokalise server; never calls the real API
+make generate   # regenerates docs/ via tfplugindocs and runs
+                # terraform fmt on examples/
+make lint       # golangci-lint
+```
+
+All tests, including the `TF_ACC=1` provider tests CI runs against several
+Terraform versions, use the in-process fake; no test touches a real Lokalise
+team. [`docs/manual-verification.md`](docs/manual-verification.md) records
+the live API behaviour the fake reproduces, and is the checklist to rerun by
+hand after Lokalise API changes.
