@@ -145,8 +145,8 @@ go build ./...
 go vet ./...
 make test       # go test ./... — unit tests only, against an in-process
                 # fake Lokalise server; never calls the real API
-make generate   # regenerates docs/ via tfplugindocs; also runs
-                # copywrite headers and terraform fmt on examples/
+make generate   # regenerates docs/ via tfplugindocs and runs
+                # terraform fmt on examples/
 make lint       # golangci-lint
 ```
 

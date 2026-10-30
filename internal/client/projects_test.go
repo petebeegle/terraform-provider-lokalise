@@ -1,4 +1,4 @@
-// Copyright IBM Corp. 2021, 2026
+// Copyright (c) 2026 Pete Beegle
 // SPDX-License-Identifier: MPL-2.0
 
 package client_test
