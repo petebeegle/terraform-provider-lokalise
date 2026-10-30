@@ -1,4 +1,10 @@
-provider "lokalise" {
-  # token can also be set via the LOKALISE_API_TOKEN environment variable
-  token = "example-token"
+terraform {
+  required_providers {
+    lokalise = {
+      source = "petebeegle/lokalise"
+    }
+  }
 }
+
+# Reads the API token from the LOKALISE_API_TOKEN environment variable.
+provider "lokalise" {}

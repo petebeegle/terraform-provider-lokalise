@@ -99,10 +99,8 @@ terraform {
   }
 }
 
-provider "lokalise" {
-  # token can also be set via the LOKALISE_API_TOKEN environment variable
-  token = "example-token"
-}
+# Reads the API token from the LOKALISE_API_TOKEN environment variable.
+provider "lokalise" {}
 ```
 
 - `token` (sensitive, optional): falls back to the `LOKALISE_API_TOKEN`
@@ -110,10 +108,12 @@ provider "lokalise" {
   neither is set.
 - `api_url` (optional): defaults to `https://api.lokalise.com/api2`.
 
+Then `terraform init` installs it from the
+[Terraform Registry](https://registry.terraform.io/providers/petebeegle/lokalise).
+
 ## Building and running locally (`dev_overrides`)
 
-This provider isn't published to a registry yet. To use a locally built
-binary without `terraform init`, use Terraform's
+To use a locally built binary instead of the registry release, use Terraform's
 [`dev_overrides`](https://developer.hashicorp.com/terraform/cli/config/config-file#development-overrides-for-provider-developers):
 
 ```shell

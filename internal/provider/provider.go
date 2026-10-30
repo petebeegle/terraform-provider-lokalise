@@ -44,6 +44,8 @@ func (p *LokaliseProvider) Metadata(ctx context.Context, req provider.MetadataRe
 
 func (p *LokaliseProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		MarkdownDescription: "Manages [Lokalise](https://lokalise.com) setup: projects, project languages, and team user groups (role, languages, members, project assignments). " +
+			"It is non-authoritative: no resource removes anything it did not create. Projects and languages have `deletion_protection`, on by default.",
 		Attributes: map[string]schema.Attribute{
 			"token": schema.StringAttribute{
 				MarkdownDescription: "Lokalise API token. May also be set via the LOKALISE_API_TOKEN environment variable.",
