@@ -1,59 +1,67 @@
-// Copyright IBM Corp. 2021, 2026
+// Copyright (c) 2026 Pete Beegle
 // SPDX-License-Identifier: MPL-2.0
 
 package provider
 
 import (
 	"context"
-	"net/http"
+	"os"
 
-	"github.com/hashicorp/terraform-plugin-framework/action"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/ephemeral"
-	"github.com/hashicorp/terraform-plugin-framework/function"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"github.com/petebeegle/terraform-provider-lokalise/internal/client"
 )
 
-// Ensure ScaffoldingProvider satisfies various provider interfaces.
-var _ provider.Provider = &ScaffoldingProvider{}
-var _ provider.ProviderWithFunctions = &ScaffoldingProvider{}
-var _ provider.ProviderWithEphemeralResources = &ScaffoldingProvider{}
-var _ provider.ProviderWithActions = &ScaffoldingProvider{}
+const defaultAPIURL = "https://api.lokalise.com/api2"
 
-// ScaffoldingProvider defines the provider implementation.
-type ScaffoldingProvider struct {
+// Ensure LokaliseProvider satisfies the provider.Provider interface.
+var _ provider.Provider = &LokaliseProvider{}
+
+// LokaliseProvider defines the provider implementation.
+type LokaliseProvider struct {
 	// version is set to the provider version on release, "dev" when the
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
 	version string
 }
 
-// ScaffoldingProviderModel describes the provider data model.
-type ScaffoldingProviderModel struct {
-	Endpoint types.String `tfsdk:"endpoint"`
+// LokaliseProviderModel describes the provider data model.
+type LokaliseProviderModel struct {
+	Token  types.String `tfsdk:"token"`
+	APIURL types.String `tfsdk:"api_url"`
 }
 
-func (p *ScaffoldingProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "scaffolding"
+func (p *LokaliseProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+	resp.TypeName = "lokalise"
 	resp.Version = p.version
 }
 
-func (p *ScaffoldingProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *LokaliseProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
+		MarkdownDescription: "Manages [Lokalise](https://lokalise.com) setup: projects, project languages, and team user groups (role, languages, members, project assignments). " +
+			"It is non-authoritative: no resource removes anything it did not create. Projects and languages have `deletion_protection`, on by default.",
 		Attributes: map[string]schema.Attribute{
-			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "Example provider attribute",
+			"token": schema.StringAttribute{
+				MarkdownDescription: "Lokalise API token. May also be set via the LOKALISE_API_TOKEN environment variable.",
+				Optional:            true,
+				Sensitive:           true,
+			},
+			"api_url": schema.StringAttribute{
+				MarkdownDescription: "Lokalise API base URL. Defaults to " + defaultAPIURL + ".",
 				Optional:            true,
 			},
 		},
 	}
 }
 
-func (p *ScaffoldingProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	var data ScaffoldingProviderModel
+func (p *LokaliseProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+	var data LokaliseProviderModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
@@ -61,49 +69,71 @@ func (p *ScaffoldingProvider) Configure(ctx context.Context, req provider.Config
 		return
 	}
 
-	// Configuration values are now available.
-	// if data.Endpoint.IsNull() { /* ... */ }
+	token := data.Token.ValueString()
+	if token == "" {
+		token = os.Getenv("LOKALISE_API_TOKEN")
+	}
+	if token == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("token"),
+			"Missing Lokalise API token",
+			"The provider requires a Lokalise API token. Set the token attribute or the LOKALISE_API_TOKEN environment variable.",
+		)
+		return
+	}
 
-	// Example client configuration for data sources and resources
-	client := http.DefaultClient
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	apiURL := data.APIURL.ValueString()
+	if apiURL == "" {
+		apiURL = defaultAPIURL
+	}
+
+	c := client.New(apiURL, token)
+	resp.DataSourceData = c
+	resp.ResourceData = c
 }
 
-func (p *ScaffoldingProvider) Resources(ctx context.Context) []func() resource.Resource {
+func (p *LokaliseProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewExampleResource,
+		NewProjectResource,
+		NewProjectLanguageResource,
+		NewTeamUserGroupResource,
+		NewTeamUserGroupMemberResource,
+		NewTeamUserGroupProjectResource,
 	}
 }
 
-func (p *ScaffoldingProvider) EphemeralResources(ctx context.Context) []func() ephemeral.EphemeralResource {
-	return []func() ephemeral.EphemeralResource{
-		NewExampleEphemeralResource,
-	}
-}
-
-func (p *ScaffoldingProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+func (p *LokaliseProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewExampleDataSource,
-	}
-}
-
-func (p *ScaffoldingProvider) Functions(ctx context.Context) []func() function.Function {
-	return []func() function.Function{
-		NewExampleFunction,
-	}
-}
-
-func (p *ScaffoldingProvider) Actions(ctx context.Context) []func() action.Action {
-	return []func() action.Action{
-		NewExampleAction,
+		NewPermissionTemplateDataSource,
+		NewTeamUserDataSource,
 	}
 }
 
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
-		return &ScaffoldingProvider{
+		return &LokaliseProvider{
 			version: version,
 		}
 	}
+}
+
+// configureClient extracts a client.API from providerData, as set by
+// LokaliseProvider.Configure on resp.ResourceData / resp.DataSourceData.
+// It returns nil if providerData is nil (Configure has not yet run), and
+// appends an error diagnostic if providerData is not a client.API.
+func configureClient(providerData any, diags *diag.Diagnostics) client.API {
+	if providerData == nil {
+		return nil
+	}
+
+	c, ok := providerData.(client.API)
+	if !ok {
+		diags.AddError(
+			"Unexpected Configure Type",
+			"Expected client.API, got a different type. This is a bug in the lokalise provider; please report it.",
+		)
+		return nil
+	}
+
+	return c
 }

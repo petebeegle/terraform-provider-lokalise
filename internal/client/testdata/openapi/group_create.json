@@ -1,0 +1,26 @@
+{
+  "team_id": 444,
+  "group": {
+    "group_id": 50031,
+    "name": "Proofreaders",
+    "permissions": {
+      "is_admin": false,
+      "is_reviewer": false,
+      "admin_rights": {},
+      "role_id": 1,
+      "languages": [
+        {
+          "lang_id": 640,
+          "lang_iso": "en",
+          "lang_name": "English",
+          "is_writable": true
+        }
+      ]
+    },
+    "created_at": "2019-01-08 09:10:46 (Etc/UTC)",
+    "created_at_timestamp": 1546257600,
+    "team_id": 444,
+    "projects": {},
+    "members": {}
+  }
+}

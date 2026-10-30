@@ -1,0 +1,30 @@
+{
+  "roles": [
+    {
+      "id": 1,
+      "role": "Manager",
+      "permissions": [
+        "activity",
+        "branches_main_modify",
+        "branches_create",
+        "branches_merge",
+        "statistics",
+        "tasks",
+        "contributors",
+        "settings",
+        "manage_languages",
+        "download",
+        "upload",
+        "glossary_delete",
+        "glossary_edit",
+        "manage_keys",
+        "screenshots",
+        "custom_status_modify"
+      ],
+      "description": "Manage project settings, contributors and tasks",
+      "tag": "Full access",
+      "tagColor": "green",
+      "doesEnableAllReadOnlyLanguages": true
+    }
+  ]
+}
