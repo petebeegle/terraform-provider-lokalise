@@ -25,7 +25,8 @@ const teamUserGroupProjectAddr = "lokalise_team_user_group_project.test"
 // teamUserGroupProjectFixture renders a project ("tf-p", base language
 // "en"), a lokalise_team_user_group and a lokalise_team_user_group_project
 // assigning the project to the group.
-func teamUserGroupProjectFixture(teamID int64) string {
+func teamUserGroupProjectFixture() string {
+	teamID := lokalisefake.DefaultTeamID
 	return projectConfig("tf-p", "en", "deletion_protection = false") + fmt.Sprintf(`
 resource "lokalise_team_user_group" "test" {
   team_id = %d
@@ -56,7 +57,7 @@ func teamUserGroupProjectState(s *terraform.State) (*terraform.ResourceState, er
 func TestTeamUserGroupProject_Lifecycle(t *testing.T) {
 	fake := lokalisefake.New(t)
 	cfg := providerConfig(fake.URL())
-	config := cfg + teamUserGroupProjectFixture(lokalisefake.DefaultTeamID)
+	config := cfg + teamUserGroupProjectFixture()
 
 	var groupID int64
 	var projectID string
@@ -134,7 +135,7 @@ resource "lokalise_team_user_group" "test" {
 func TestTeamUserGroupProject_RemovedOutOfBand(t *testing.T) {
 	fake := lokalisefake.New(t)
 	cfg := providerConfig(fake.URL())
-	config := cfg + teamUserGroupProjectFixture(lokalisefake.DefaultTeamID)
+	config := cfg + teamUserGroupProjectFixture()
 
 	var groupID int64
 	var projectID string
@@ -178,7 +179,7 @@ func TestTeamUserGroupProject_RemovedOutOfBand(t *testing.T) {
 func TestTeamUserGroupProject_ImportBadID(t *testing.T) {
 	fake := lokalisefake.New(t)
 	cfg := providerConfig(fake.URL())
-	config := cfg + teamUserGroupProjectFixture(lokalisefake.DefaultTeamID)
+	config := cfg + teamUserGroupProjectFixture()
 
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testProviderFactories,
@@ -204,7 +205,7 @@ func TestTeamUserGroupProject_AlreadyAssigned(t *testing.T) {
 	fake := lokalisefake.New(t)
 	cfg := providerConfig(fake.URL())
 
-	full := teamUserGroupProjectFixture(lokalisefake.DefaultTeamID)
+	full := teamUserGroupProjectFixture()
 	groupOnly := full[:strings.Index(full, `resource "lokalise_team_user_group_project"`)]
 
 	var groupID int64

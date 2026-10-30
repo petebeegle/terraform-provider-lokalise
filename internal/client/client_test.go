@@ -20,7 +20,7 @@ func TestDo_SendsTokenHeader(t *testing.T) {
 			t.Errorf("X-Api-Token = %q, want %q", got, "tok")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	defer srv.Close()
 
@@ -41,7 +41,7 @@ func TestDo_Retries429ThenSucceeds(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	defer srv.Close()
 
@@ -65,7 +65,7 @@ func TestDo_Retries5xx(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	defer srv.Close()
 
@@ -158,7 +158,7 @@ func TestAPIError_DecodesErrorBody(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":{"code":404,"message":"Not Found"}}`))
+		_, _ = w.Write([]byte(`{"error":{"code":404,"message":"Not Found"}}`))
 	}))
 	defer srv.Close()
 
@@ -223,7 +223,7 @@ func TestListAll_FollowsPages(t *testing.T) {
 func TestRateLimit_Throttles(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	defer srv.Close()
 
@@ -269,7 +269,12 @@ func TestDo_POSTNotRetriedOnNetworkError(t *testing.T) {
 	var hits int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&hits, 1)
-		conn, _, err := w.(http.Hijacker).Hijack()
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			t.Error("response writer is not an http.Hijacker")
+			return
+		}
+		conn, _, err := hj.Hijack()
 		if err != nil {
 			t.Errorf("hijack: %v", err)
 			return
@@ -296,7 +301,7 @@ func TestDo_POSTRetries429(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"ok":true}`))
+		_, _ = w.Write([]byte(`{"ok":true}`))
 	}))
 	defer srv.Close()
 
@@ -320,11 +325,16 @@ func TestDo_IdempotentMethodsRetry5xxAndNetworkErrors(t *testing.T) {
 				case 1:
 					w.WriteHeader(http.StatusServiceUnavailable)
 				case 2:
-					conn, _, _ := w.(http.Hijacker).Hijack()
+					hj, ok := w.(http.Hijacker)
+					if !ok {
+						t.Error("response writer is not an http.Hijacker")
+						return
+					}
+					conn, _, _ := hj.Hijack()
 					conn.Close()
 				default:
 					w.Header().Set("Content-Type", "application/json")
-					w.Write([]byte(`{"ok":true}`))
+					_, _ = w.Write([]byte(`{"ok":true}`))
 				}
 			}))
 			defer srv.Close()
@@ -354,7 +364,7 @@ func TestAPIError_IncludesDetails(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":{"code":400,"message":"Invalid request","details":{"lang_iso":"Language code is not valid"}}}`))
+		_, _ = w.Write([]byte(`{"error":{"code":400,"message":"Invalid request","details":{"lang_iso":"Language code is not valid"}}}`))
 	}))
 	defer srv.Close()
 

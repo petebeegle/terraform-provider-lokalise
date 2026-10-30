@@ -27,12 +27,7 @@ type teamUserWire struct {
 }
 
 func (w teamUserWire) toTeamUser() TeamUser {
-	return TeamUser{
-		UserID:   w.UserID,
-		Email:    w.Email,
-		Fullname: w.Fullname,
-		Role:     w.Role,
-	}
+	return TeamUser(w)
 }
 
 // ListTeamUsers lists every user known to teamID.

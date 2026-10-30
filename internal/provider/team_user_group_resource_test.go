@@ -26,7 +26,8 @@ const teamUserGroupAddr = "lokalise_team_user_group.test"
 // is inserted verbatim (e.g. `role_id = 5` or `admin_rights = ["upload"]`),
 // and languagesBlock is the resource's `languages` attribute, verbatim
 // (including the leading `languages = { ... }` or omitted entirely).
-func teamUserGroupFixture(teamID int64, name, roleOrRights, languagesBlock string) string {
+func teamUserGroupFixture(name, roleOrRights, languagesBlock string) string {
+	teamID := lokalisefake.DefaultTeamID
 	return fmt.Sprintf(`
 resource "lokalise_team_user_group" "test" {
   team_id = %d
@@ -54,7 +55,7 @@ func TestTeamUserGroup_Lifecycle(t *testing.T) {
     contributable = ["fr"]
   }
 `
-	config := cfg + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Translators", "role_id = 5", languages)
+	config := cfg + teamUserGroupFixture("Translators", "role_id = 5", languages)
 
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testProviderFactories,
@@ -88,7 +89,7 @@ func TestTeamUserGroup_Lifecycle(t *testing.T) {
 				},
 			},
 			{
-				Config: cfg + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Translators Renamed", "role_id = 5", languages),
+				Config: cfg + teamUserGroupFixture("Translators Renamed", "role_id = 5", languages),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectResourceAction(teamUserGroupAddr, plancheck.ResourceActionUpdate),
@@ -116,7 +117,7 @@ func TestTeamUserGroup_UpdateKeepsMembers(t *testing.T) {
 		ProtoV6ProviderFactories: testProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: cfg + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Translators", "role_id = 5", languages),
+				Config: cfg + teamUserGroupFixture("Translators", "role_id = 5", languages),
 				Check: func(s *terraform.State) error {
 					rs, err := teamUserGroupState(s)
 					if err != nil {
@@ -134,7 +135,7 @@ func TestTeamUserGroup_UpdateKeepsMembers(t *testing.T) {
 				PreConfig: func() {
 					fake.AddGroupMemberOutOfBand(lokalisefake.DefaultTeamID, groupID, 9001)
 				},
-				Config: cfg + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Translators Renamed", "role_id = 5", languages),
+				Config: cfg + teamUserGroupFixture("Translators Renamed", "role_id = 5", languages),
 				Check: func(s *terraform.State) error {
 					c := client.New(fake.URL(), "test-token", client.WithRateLimit(1000, 1000))
 					g, err := c.GetGroup(context.Background(), lokalisefake.DefaultTeamID, groupID)
@@ -156,7 +157,7 @@ func TestTeamUserGroup_UpdateKeepsMembers(t *testing.T) {
 func TestTeamUserGroup_UnknownISO(t *testing.T) {
 	fake := lokalisefake.New(t)
 	cfg := providerConfig(fake.URL())
-	config := cfg + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Translators", "role_id = 5", `
+	config := cfg + teamUserGroupFixture("Translators", "role_id = 5", `
   languages = {
     contributable = ["xx"]
   }
@@ -176,7 +177,7 @@ func TestTeamUserGroup_UnknownISO(t *testing.T) {
 func TestTeamUserGroup_RoleAndRightsConflict(t *testing.T) {
 	fake := lokalisefake.New(t)
 	cfg := providerConfig(fake.URL())
-	config := cfg + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Translators", `role_id      = 5
+	config := cfg + teamUserGroupFixture("Translators", `role_id      = 5
   admin_rights = ["upload"]`, `
   languages = {
     contributable = ["fr"]
@@ -197,7 +198,7 @@ func TestTeamUserGroup_RoleAndRightsConflict(t *testing.T) {
 func TestTeamUserGroup_RemovedOutOfBand(t *testing.T) {
 	fake := lokalisefake.New(t)
 	cfg := providerConfig(fake.URL())
-	config := cfg + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Translators", "role_id = 5", `
+	config := cfg + teamUserGroupFixture("Translators", "role_id = 5", `
   languages = {
     contributable = ["fr"]
   }
@@ -239,7 +240,7 @@ func TestTeamUserGroup_RemovedOutOfBand(t *testing.T) {
 func TestTeamUserGroup_ImportBadID(t *testing.T) {
 	fake := lokalisefake.New(t)
 	cfg := providerConfig(fake.URL())
-	config := cfg + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Translators", "role_id = 5", `
+	config := cfg + teamUserGroupFixture("Translators", "role_id = 5", `
   languages = {
     contributable = ["fr"]
   }
@@ -273,7 +274,7 @@ func TestTeamUserGroup_EmptyReferenceRoundTrips(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			fake := lokalisefake.New(t)
-			config := providerConfig(fake.URL()) + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Translators", "role_id = 5", languages)
+			config := providerConfig(fake.URL()) + teamUserGroupFixture("Translators", "role_id = 5", languages)
 
 			resource.UnitTest(t, resource.TestCase{
 				ProtoV6ProviderFactories: testProviderFactories,
@@ -310,7 +311,7 @@ func TestTeamUserGroup_RequiresContributableLanguage(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			fake := lokalisefake.New(t)
-			config := providerConfig(fake.URL()) + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Translators", "role_id = 5", tc.languages)
+			config := providerConfig(fake.URL()) + teamUserGroupFixture("Translators", "role_id = 5", tc.languages)
 
 			resource.UnitTest(t, resource.TestCase{
 				ProtoV6ProviderFactories: testProviderFactories,
@@ -330,7 +331,7 @@ func TestTeamUserGroup_RequiresContributableLanguage(t *testing.T) {
 // or a diff, while a configured right removed out of band does.
 func TestTeamUserGroup_AdminRightsAddedByAPI(t *testing.T) {
 	fake := lokalisefake.New(t)
-	config := providerConfig(fake.URL()) + teamUserGroupFixture(lokalisefake.DefaultTeamID, "Uploaders", `admin_rights = ["upload"]`,
+	config := providerConfig(fake.URL()) + teamUserGroupFixture("Uploaders", `admin_rights = ["upload"]`,
 		`languages = { contributable = ["en"] }`)
 
 	var groupID int64

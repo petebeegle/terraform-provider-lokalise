@@ -54,10 +54,10 @@ func TestFake_MatchesOpenAPIExampleShapes(t *testing.T) {
 	}
 
 	proj := call("POST", "/projects", map[string]any{"name": "p", "base_lang_iso": "en", "languages": []any{map[string]any{"lang_iso": "en"}}})
-	projectID := proj["project_id"].(string)
+	projectID := fieldAt[string](t, proj, "project_id")
 
 	langCreate := call("POST", "/projects/"+projectID+"/languages", map[string]any{"languages": []any{map[string]any{"lang_iso": "fr"}}})
-	langID := strconv.FormatInt(int64(langCreate["languages"].([]any)[0].(map[string]any)["lang_id"].(float64)), 10)
+	langID := strconv.FormatInt(int64(fieldAt[float64](t, langCreate, "languages.0.lang_id")), 10)
 	langGet := call("GET", "/projects/"+projectID+"/languages/"+langID, nil)
 	langUpdate := call("PUT", "/projects/"+projectID+"/languages/"+langID, map[string]any{"lang_iso": "fr", "lang_name": "French", "plural_forms": []string{"one", "other"}})
 
@@ -65,14 +65,14 @@ func TestFake_MatchesOpenAPIExampleShapes(t *testing.T) {
 		"email": "a@example.com", "fullname": "A", "role_id": 1,
 		"languages": []any{map[string]any{"lang_iso": "en", "is_writable": true}},
 	}}})
-	userID := strconv.FormatInt(int64(contribCreate["contributor"].(map[string]any)["user_id"].(float64)), 10)
+	userID := strconv.FormatInt(int64(fieldAt[float64](t, contribCreate, "contributor.user_id")), 10)
 	contribList := call("GET", "/projects/"+projectID+"/contributors", nil)
 	contribGet := call("GET", "/projects/"+projectID+"/contributors/"+userID, nil)
 	contribUpdate := call("PUT", "/projects/"+projectID+"/contributors/"+userID, map[string]any{"role_id": 1, "languages": []any{map[string]any{"lang_iso": "en", "is_writable": true}}})
 
 	groupBody := map[string]any{"name": "g", "role_id": 1, "languages": map[string]any{"reference": []int64{640}, "contributable": []int64{640}}}
 	groupCreate := call("POST", "/teams/"+teamStr+"/groups", groupBody)
-	groupID := strconv.FormatInt(int64(groupCreate["group"].(map[string]any)["group_id"].(float64)), 10)
+	groupID := strconv.FormatInt(int64(fieldAt[float64](t, groupCreate, "group.group_id")), 10)
 	groupGet := call("GET", "/teams/"+teamStr+"/groups/"+groupID, nil)
 	groupUpdate := call("PUT", "/teams/"+teamStr+"/groups/"+groupID, groupBody)
 	membersAdd := call("PUT", "/teams/"+teamStr+"/groups/"+groupID+"/members/add", map[string]any{"users": []int64{22212}})
@@ -146,35 +146,21 @@ func TestFake_MatchesOpenAPIExampleShapes(t *testing.T) {
 
 	// Specific encodings the examples use, which the fake must reproduce so
 	// the client's tolerance for them is exercised by provider tests.
-	if v := contribList["contributors"].([]any)[0].(map[string]any)["languages"].([]any)[0].(map[string]any)["is_writable"]; v != float64(1) {
+	if v := fieldAt[any](t, contribList, "contributors.0.languages.0.is_writable"); v != float64(1) {
 		t.Errorf("contributor list is_writable = %#v, want 1", v)
 	}
 	if v, ok := groupGet["admin_rights"]; ok {
 		t.Errorf("group GET has top-level admin_rights %v; the example nests it under permissions", v)
 	}
-	if v := groupCreate["group"].(map[string]any)["members"]; fmt.Sprint(v) != "map[]" {
+	if v := fieldAt[any](t, groupCreate, "group.members"); fmt.Sprint(v) != "map[]" {
 		t.Errorf("empty group members = %#v, want {}", v)
 	}
 }
 
 func at(v map[string]any, path string) (map[string]any, error) {
-	if path == "" {
-		return v, nil
-	}
-	var cur any = v
-	for _, seg := range strings.Split(path, ".") {
-		switch c := cur.(type) {
-		case map[string]any:
-			cur = c[seg]
-		case []any:
-			i, err := strconv.Atoi(seg)
-			if err != nil || i >= len(c) {
-				return nil, fmt.Errorf("bad index %q", seg)
-			}
-			cur = c[i]
-		default:
-			return nil, fmt.Errorf("cannot descend into %T at %q", cur, seg)
-		}
+	cur, err := lookup(v, path)
+	if err != nil {
+		return nil, err
 	}
 	m, ok := cur.(map[string]any)
 	if !ok {
@@ -190,4 +176,42 @@ func sortedKeys(m map[string]any) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// lookup walks a dotted path of object keys and array indexes from v.
+func lookup(v map[string]any, path string) (any, error) {
+	var cur any = v
+	if path == "" {
+		return cur, nil
+	}
+	for _, seg := range strings.Split(path, ".") {
+		switch c := cur.(type) {
+		case map[string]any:
+			cur = c[seg]
+		case []any:
+			i, err := strconv.Atoi(seg)
+			if err != nil || i >= len(c) {
+				return nil, fmt.Errorf("bad index %q", seg)
+			}
+			cur = c[i]
+		default:
+			return nil, fmt.Errorf("cannot descend into %T at %q", cur, seg)
+		}
+	}
+	return cur, nil
+}
+
+// fieldAt returns the value at path in v as a T, failing the test if the
+// path is missing or holds another type.
+func fieldAt[T any](t *testing.T, v map[string]any, path string) T {
+	t.Helper()
+	cur, err := lookup(v, path)
+	if err != nil {
+		t.Fatalf("%s: %v", path, err)
+	}
+	out, ok := cur.(T)
+	if !ok {
+		t.Fatalf("%s is %T, want %T", path, cur, out)
+	}
+	return out
 }

@@ -65,10 +65,10 @@ func WithRateLimit(rps float64, burst int) Option {
 }
 
 // WithBackoff overrides the base and max durations used for retry backoff.
-func WithBackoff(base, max time.Duration) Option {
+func WithBackoff(base, maxDelay time.Duration) Option {
 	return func(c *HTTPClient) {
 		c.backoffBase = base
-		c.backoffMax = max
+		c.backoffMax = maxDelay
 	}
 }
 
@@ -244,14 +244,14 @@ func parseAPIError(statusCode int, body []byte) *APIError {
 }
 
 // backoffDuration returns a full-jitter exponential backoff duration for the
-// given attempt (0-indexed), bounded by [0, max].
-func backoffDuration(attempt int, base, max time.Duration) time.Duration {
+// given attempt (0-indexed), bounded by [0, maxDelay].
+func backoffDuration(attempt int, base, maxDelay time.Duration) time.Duration {
 	if base <= 0 {
 		return 0
 	}
 	capDur := float64(base) * math.Pow(2, float64(attempt))
-	if capDur > float64(max) || capDur <= 0 {
-		capDur = float64(max)
+	if capDur > float64(maxDelay) || capDur <= 0 {
+		capDur = float64(maxDelay)
 	}
 	return time.Duration(rand.Float64() * capDur)
 }

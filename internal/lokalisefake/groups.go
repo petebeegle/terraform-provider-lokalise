@@ -55,7 +55,7 @@ type groupJSON struct {
 func (g *group) toJSON() groupJSON {
 	langs := make([]groupLanguageJSON, 0, len(g.Languages))
 	for _, l := range g.Languages {
-		langs = append(langs, groupLanguageJSON{LangID: l.LangID, IsWritable: l.IsWritable})
+		langs = append(langs, groupLanguageJSON(l))
 	}
 	return groupJSON{
 		GroupID: g.GroupID,

@@ -22,26 +22,17 @@ import (
 
 const projectLanguageAddr = "lokalise_project_language.test"
 
-// projectAndLanguageConfig renders a lokalise_project resource ("tf-p", base
-// language "en") together with a lokalise_project_language resource for iso.
-// projectExtra and langExtra are inserted verbatim into the respective
-// resource blocks.
-func projectAndLanguageConfig(projectExtra, iso, langExtra string) string {
-	return projectConfig("tf-p", "en", projectExtra) + fmt.Sprintf(`
+// projectAndLanguageConfig renders a deletable lokalise_project resource
+// ("tf-p", base language "en") together with a lokalise_project_language
+// resource for iso. langExtra is inserted verbatim into the language block.
+func projectAndLanguageConfig(iso, langExtra string) string {
+	return projectConfig("tf-p", "en", "deletion_protection = false") + fmt.Sprintf(`
 resource "lokalise_project_language" "test" {
   project_id = lokalise_project.test.id
   lang_iso   = %q
   %s
 }
 `, iso, langExtra)
-}
-
-func projectIDFromAddr(s *terraform.State, addr string) (string, error) {
-	rs, ok := s.RootModule().Resources[addr]
-	if !ok {
-		return "", fmt.Errorf("%s not in state", addr)
-	}
-	return rs.Primary.ID, nil
 }
 
 func TestProjectLanguage_Lifecycle(t *testing.T) {
@@ -52,7 +43,7 @@ func TestProjectLanguage_Lifecycle(t *testing.T) {
 		ProtoV6ProviderFactories: testProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: cfg + projectAndLanguageConfig("deletion_protection = false", "fr", "deletion_protection = false"),
+				Config: cfg + projectAndLanguageConfig("fr", "deletion_protection = false"),
 				ConfigStateChecks: []statecheck.StateCheck{
 					stateValue(projectLanguageAddr, "lang_iso", knownvalue.StringExact("fr")),
 					stateValue(projectLanguageAddr, "lang_id", knownvalue.NotNull()),
@@ -74,7 +65,7 @@ func TestProjectLanguage_Lifecycle(t *testing.T) {
 				ResourceName: projectLanguageAddr,
 				ImportState:  true,
 				ImportStateIdFunc: func(s *terraform.State) (string, error) {
-					projectID, err := projectIDFromAddr(s, projectAddr)
+					projectID, err := projectIDFromState(s)
 					if err != nil {
 						return "", err
 					}
@@ -84,7 +75,7 @@ func TestProjectLanguage_Lifecycle(t *testing.T) {
 				ImportStateVerifyIgnore: []string{"deletion_protection"},
 			},
 			{
-				Config: cfg + projectAndLanguageConfig("deletion_protection = false", "fr", `deletion_protection = false
+				Config: cfg + projectAndLanguageConfig("fr", `deletion_protection = false
   custom_name = "French (FR)"`),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
@@ -107,13 +98,13 @@ func TestProjectLanguage_DeletionProtectionBlocksDestroy(t *testing.T) {
 		ProtoV6ProviderFactories: testProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: cfg + projectAndLanguageConfig("deletion_protection = false", "fr", ""),
+				Config: cfg + projectAndLanguageConfig("fr", ""),
 				ConfigStateChecks: []statecheck.StateCheck{
 					stateValue(projectLanguageAddr, "deletion_protection", knownvalue.Bool(true)),
 				},
 			},
 			{
-				Config:      cfg + projectAndLanguageConfig("deletion_protection = false", "fr", ""),
+				Config:      cfg + projectAndLanguageConfig("fr", ""),
 				Destroy:     true,
 				ExpectError: regexp.MustCompile(`Deletion protection enabled`),
 			},
@@ -125,7 +116,7 @@ func TestProjectLanguage_DeletionProtectionBlocksDestroy(t *testing.T) {
 						}
 					}
 				},
-				Config: cfg + projectAndLanguageConfig("deletion_protection = false", "fr", "deletion_protection = false"),
+				Config: cfg + projectAndLanguageConfig("fr", "deletion_protection = false"),
 				ConfigStateChecks: []statecheck.StateCheck{
 					stateValue(projectLanguageAddr, "deletion_protection", knownvalue.Bool(false)),
 				},
@@ -142,7 +133,7 @@ func TestProjectLanguage_BaseLanguageDuplicate(t *testing.T) {
 		ProtoV6ProviderFactories: testProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:      cfg + projectAndLanguageConfig("deletion_protection = false", "en", "deletion_protection = false"),
+				Config:      cfg + projectAndLanguageConfig("en", "deletion_protection = false"),
 				ExpectError: regexp.MustCompile(`Language already exists`),
 			},
 		},
@@ -170,7 +161,7 @@ resource "lokalise_project_language" "test" {
 				ResourceName: projectLanguageAddr,
 				ImportState:  true,
 				ImportStateIdFunc: func(s *terraform.State) (string, error) {
-					projectID, err := projectIDFromAddr(s, projectAddr)
+					projectID, err := projectIDFromState(s)
 					if err != nil {
 						return "", err
 					}
@@ -191,7 +182,7 @@ resource "lokalise_project_language" "test" {
 							return fmt.Errorf("unexpected request %q removing the base language", r)
 						}
 					}
-					projectID, err := projectIDFromAddr(s, projectAddr)
+					projectID, err := projectIDFromState(s)
 					if err != nil {
 						return err
 					}
@@ -210,7 +201,7 @@ resource "lokalise_project_language" "test" {
 func TestProjectLanguage_RemovedOutOfBand(t *testing.T) {
 	fake := lokalisefake.New(t)
 	cfg := providerConfig(fake.URL())
-	config := cfg + projectAndLanguageConfig("deletion_protection = false", "fr", "deletion_protection = false")
+	config := cfg + projectAndLanguageConfig("fr", "deletion_protection = false")
 
 	var projectID string
 	var langID int64
@@ -250,7 +241,7 @@ func TestProjectLanguage_RemovedOutOfBand(t *testing.T) {
 func TestProjectLanguage_ImportBadID(t *testing.T) {
 	fake := lokalisefake.New(t)
 	cfg := providerConfig(fake.URL())
-	config := cfg + projectAndLanguageConfig("deletion_protection = false", "fr", "deletion_protection = false")
+	config := cfg + projectAndLanguageConfig("fr", "deletion_protection = false")
 
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testProviderFactories,
@@ -293,10 +284,10 @@ func TestProjectLanguage_DeletionProtectionOnlyChangeSendsNoPUT(t *testing.T) {
 		ProtoV6ProviderFactories: testProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: cfg + projectAndLanguageConfig("deletion_protection = false", "fr", ""),
+				Config: cfg + projectAndLanguageConfig("fr", ""),
 			},
 			{
-				Config: cfg + projectAndLanguageConfig("deletion_protection = false", "fr", "deletion_protection = false"),
+				Config: cfg + projectAndLanguageConfig("fr", "deletion_protection = false"),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectResourceAction(projectLanguageAddr, plancheck.ResourceActionUpdate),
@@ -333,15 +324,15 @@ func TestProjectLanguage_ChangeISOKeepsNameAndPluralForms(t *testing.T) {
 		ProtoV6ProviderFactories: testProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: cfg + projectAndLanguageConfig("deletion_protection = false", "fr", "deletion_protection = false"),
+				Config: cfg + projectAndLanguageConfig("fr", "deletion_protection = false"),
 				Check: func(s *terraform.State) error {
 					var err error
-					projectID, err = projectIDFromAddr(s, projectAddr)
+					projectID, err = projectIDFromState(s)
 					return err
 				},
 			},
 			{
-				Config: cfg + projectAndLanguageConfig("deletion_protection = false", "fr_CA", "deletion_protection = false"),
+				Config: cfg + projectAndLanguageConfig("fr_CA", "deletion_protection = false"),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectResourceAction(projectLanguageAddr, plancheck.ResourceActionUpdate),

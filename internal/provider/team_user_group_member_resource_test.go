@@ -24,7 +24,8 @@ const teamUserGroupMemberAddr = "lokalise_team_user_group_member.test"
 
 // teamUserGroupMemberFixture renders a lokalise_team_user_group and a
 // lokalise_team_user_group_member assigning userID to it.
-func teamUserGroupMemberFixture(teamID, userID int64) string {
+func teamUserGroupMemberFixture(userID int64) string {
+	teamID := lokalisefake.DefaultTeamID
 	return fmt.Sprintf(`
 resource "lokalise_team_user_group" "test" {
   team_id = %d
@@ -57,7 +58,7 @@ func TestTeamUserGroupMember_Lifecycle(t *testing.T) {
 	cfg := providerConfig(fake.URL())
 
 	userID := fake.AddTeamUser(lokalisefake.DefaultTeamID, "b@example.com")
-	config := cfg + teamUserGroupMemberFixture(lokalisefake.DefaultTeamID, userID)
+	config := cfg + teamUserGroupMemberFixture(userID)
 
 	var groupID int64
 
@@ -131,7 +132,7 @@ func TestTeamUserGroupMember_RemovedOutOfBand(t *testing.T) {
 	cfg := providerConfig(fake.URL())
 
 	userID := fake.AddTeamUser(lokalisefake.DefaultTeamID, "b@example.com")
-	config := cfg + teamUserGroupMemberFixture(lokalisefake.DefaultTeamID, userID)
+	config := cfg + teamUserGroupMemberFixture(userID)
 
 	var groupID int64
 
@@ -168,7 +169,7 @@ func TestTeamUserGroupMember_ImportBadID(t *testing.T) {
 	fake := lokalisefake.New(t)
 	cfg := providerConfig(fake.URL())
 	userID := fake.AddTeamUser(lokalisefake.DefaultTeamID, "b@example.com")
-	config := cfg + teamUserGroupMemberFixture(lokalisefake.DefaultTeamID, userID)
+	config := cfg + teamUserGroupMemberFixture(userID)
 
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testProviderFactories,
@@ -196,7 +197,7 @@ func TestTeamUserGroupMember_AlreadyMember(t *testing.T) {
 	cfg := providerConfig(fake.URL())
 
 	userID := fake.AddTeamUser(lokalisefake.DefaultTeamID, "b@example.com")
-	full := teamUserGroupMemberFixture(lokalisefake.DefaultTeamID, userID)
+	full := teamUserGroupMemberFixture(userID)
 	groupOnly := full[:strings.Index(full, `resource "lokalise_team_user_group_member"`)]
 
 	var groupID int64

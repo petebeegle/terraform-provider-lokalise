@@ -108,7 +108,7 @@ func (c *HTTPClient) GetProject(ctx context.Context, projectID string) (*Project
 
 // UpdateProject updates a project's name and description.
 func (c *HTTPClient) UpdateProject(ctx context.Context, projectID string, in UpdateProjectInput) (*Project, error) {
-	req := updateProjectRequest{Name: in.Name, Description: in.Description}
+	req := updateProjectRequest(in)
 	var out projectWire
 	if _, err := c.do(ctx, http.MethodPut, projectPath(projectID), nil, req, &out); err != nil {
 		return nil, err

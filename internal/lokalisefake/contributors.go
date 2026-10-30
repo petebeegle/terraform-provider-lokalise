@@ -57,7 +57,7 @@ func (c *contributor) toJSON(reverseRights bool) contributorJSON {
 	}
 	langs := make([]contributorLanguageJSON, 0, len(c.Languages))
 	for _, l := range c.Languages {
-		langs = append(langs, contributorLanguageJSON{LangISO: l.LangISO, IsWritable: l.IsWritable})
+		langs = append(langs, contributorLanguageJSON(l))
 	}
 	return contributorJSON{
 		UserID:      c.UserID,
@@ -141,7 +141,7 @@ func (s *Server) handleCreateContributors(w http.ResponseWriter, r *http.Request
 		u := s.findOrCreateTeamUserLocked(p.TeamID, in.Email, in.Fullname)
 		langs := make([]contributorLanguage, 0, len(in.Languages))
 		for _, l := range in.Languages {
-			langs = append(langs, contributorLanguage{LangISO: l.LangISO, IsWritable: l.IsWritable})
+			langs = append(langs, contributorLanguage(l))
 		}
 		email := in.Email
 		if s.lowercaseEmails {
@@ -204,7 +204,7 @@ func (s *Server) handleUpdateContributor(w http.ResponseWriter, r *http.Request)
 	c.AdminRights = append([]string(nil), body.AdminRights...)
 	langs := make([]contributorLanguage, 0, len(body.Languages))
 	for _, l := range body.Languages {
-		langs = append(langs, contributorLanguage{LangISO: l.LangISO, IsWritable: l.IsWritable})
+		langs = append(langs, contributorLanguage(l))
 	}
 	c.Languages = langs
 
