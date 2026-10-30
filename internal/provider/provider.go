@@ -96,6 +96,7 @@ func (p *LokaliseProvider) Resources(ctx context.Context) []func() resource.Reso
 	return []func() resource.Resource{
 		NewProjectResource,
 		NewProjectLanguageResource,
+		NewContributorResource,
 		NewTeamUserGroupResource,
 		NewTeamUserGroupMemberResource,
 		NewTeamUserGroupProjectResource,

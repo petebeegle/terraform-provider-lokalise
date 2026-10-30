@@ -525,11 +525,9 @@ Observed (any gateway errors seen on create): 2026-10-29: none.
 
 ## Deferred with `lokalise_contributor`
 
-`lokalise_contributor` was removed from the provider: creating a contributor
-needs a second Lokalise user who is not the token owner. It lives on the
-`contributor-resource` branch. Run these items before bringing it back.
-The client's contributor methods are still in `internal/client` and the
-fake.
+Creating a contributor needs a second Lokalise user who is not the token
+owner, so these items have not been run. Run them before relying on
+`lokalise_contributor`.
 
 ### 8. Contributor response shape
 
